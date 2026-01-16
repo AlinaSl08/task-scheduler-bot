@@ -16,7 +16,7 @@ import calendar
 from datetime import datetime
 from dotenv import load_dotenv
 import os
-
+import json
 
 
 #настроить выбор часового пояса в самом начале использования и потом менять в настройках
@@ -33,9 +33,8 @@ import os
 #если пишу часы текстом, то сообщение дает уведу но не удаляет предыдущ сообщение, если пользователь на середине нажжал на старт то может продолжить создание задачи и потом выдает ошибку
 #если пользователь остановился на моменте создания задачи и потом вернулся заново и попытался задачу добавить(в новой сессии запуска бота), то вылетает ошибка потому что не находит предыдущие внесенные ключи
 
-#сделать общую функцию для вывода и убрать tasks_str
 #сделать вывод задач сегодня\на неделю
-#сделать под каждого пользователя адаптацию по айди
+
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -48,7 +47,24 @@ logging.basicConfig(level=logging.INFO) #уровень логирования
 main_router = Router()
 dp.include_router(main_router) #добавляет роутер в поле зрения(в диспетчер)
 
+# Запись и чтение в JSON
+def save_data():
+    with open('data.json', 'w', encoding='utf8') as f:
+        json_data = json.dumps(tasks)
+        f.write(json_data)
+
+def read_data():
+    global tasks
+    with open('data.json', 'r', encoding='utf8') as f:
+        json_input = f.read()
+        info = json.loads(json_input)
+        print(tasks)
+        for key, item in info.items():
+            tasks[int(key)] = item
+        print(tasks)
+
 tasks = {}
+read_data()
 
 days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
@@ -90,9 +106,8 @@ async def start(message: Message): #обозначаем что мы дадим 
     await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
     if message.chat.id not in tasks:
         tasks[message.chat.id] = []
-        tg_id = message.chat.id
-        for i in range(len(tasks[tg_id])):
-            print(tasks[tg_id][i])
+        save_data()
+
 
 
 @main_router.message(Command("help"))
@@ -227,6 +242,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
+    save_data()
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
@@ -251,6 +267,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
+    save_data()
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
