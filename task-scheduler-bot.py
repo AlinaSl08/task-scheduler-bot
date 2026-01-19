@@ -21,8 +21,6 @@ import json
 
 #настроить выбор часового пояса в самом начале использования и потом менять в настройках
 #сделать напоминания по времени
-#сделать сохранение в json
-#доделать кнопку удаления
 #доделать кнопку изменения
 #опубликовать бота для постоянной работы
 #подключить бд
@@ -34,6 +32,8 @@ import json
 #если пользователь остановился на моменте создания задачи и потом вернулся заново и попытался задачу добавить(в новой сессии запуска бота), то вылетает ошибка потому что не находит предыдущие внесенные ключи
 
 #сделать вывод задач сегодня\на неделю
+
+#сделать по-умолчанию: часовой пояс, сортировку, формат вывода
 
 
 load_dotenv()
@@ -588,7 +588,7 @@ def convert_selected_days_to_str(selected_days):
             result.append(days[i])
     return result
 
-
+#--ФУНКЦИЯ ВЫВОДА--
 def output_task(tg_id: int):
     tasks_list = ["📌 Список дел:"]
     for idx, task in enumerate(tasks[tg_id], 1):
@@ -612,6 +612,8 @@ async def output(call: CallbackQuery):
         await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await call.answer()
     else:
+
+
         out = output_task(tg_id)
         await call.message.answer(out)
         await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
@@ -685,8 +687,9 @@ def settings_menu_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="📁 Сортировка", callback_data="sorting")
     kb.button(text="🕰️ Часовой пояс", callback_data="timezone")
+    kb.button(text="📊 Формат вывода", callback_data="format_output")
     kb.button(text="⬅️ Назад", callback_data="cancel_setting")
-    kb.adjust(2, 1)
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 #клавиатура видов сортировки
@@ -708,7 +711,35 @@ def time_zone_keyboard():
     kb.adjust(3, 3, 3, 3, 2)
     return kb.as_markup()
 
+#клавиатура формата вывода
+def format_output_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📝 Задачи на сегодня", callback_data="task_today")
+    kb.button(text="📅 Задачи на неделю", callback_data="task_week")
+    kb.button(text="♾️ Все задачи", callback_data="task_all")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.adjust(2, 2)
+    return kb.as_markup()
+
 #-ФУНКЦИИ КЛАВИАТУРЫ-
+
+#вывод на сегодня
+@main_router.callback_query(F.data == "task_today") #доделать
+async def task_today(call: CallbackQuery):
+    pass
+
+#вывод на неделю
+@main_router.callback_query(F.data == "task_week") #доделать
+async def task_week(call: CallbackQuery):
+    pass
+
+#вывод всех задач
+@main_router.callback_query(F.data == "task_all") #доделать
+async def task_all(call: CallbackQuery):
+    await safe_delete(call.message)
+    await call.message.answer("Вывод задач будет общий")
+    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await call.answer()
 
 #сортировка по названию
 @main_router.callback_query(F.data == "sort_name")
@@ -747,6 +778,13 @@ async def sort_time(call: CallbackQuery):
 @main_router.callback_query(F.data.startswith ("utc")) #тут доделать
 async def utc_selection(call: CallbackQuery):
     pass
+
+#-ФОРМАТ ВЫВОДА-
+@main_router.callback_query(F.data == "format_output")
+async def format_output(call: CallbackQuery):
+    await safe_delete(call.message)
+    await call.message.answer("Выберите формат вывода задач:", reply_markup=format_output_keyboard())
+    await call.answer()
 
 #-СОРТИРОВКА-
 @main_router.callback_query(F.data == "sorting")
