@@ -22,7 +22,6 @@ import json
 #настроить выбор часового пояса в самом начале использования и потом менять в настройках
 #сделать напоминания по времени
 #доделать кнопку изменения
-#опубликовать бота для постоянной работы
 #подключить бд
 #сделать статистику по выполненным задачам
 #сделать кнопки выполнения задач
@@ -34,7 +33,8 @@ import json
 #сделать вывод задач сегодня\на неделю
 
 #сделать по-умолчанию: часовой пояс, сортировку, формат вывода
-
+#сделать команду меню
+#починить настройки вначале
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -48,23 +48,25 @@ main_router = Router()
 dp.include_router(main_router) #добавляет роутер в поле зрения(в диспетчер)
 
 # Запись и чтение в JSON
-def save_data():
-    with open('data.json', 'w', encoding='utf8') as f:
-        json_data = json.dumps(tasks)
+def save_to_file(file_name, dictionary):
+    with open(file_name, 'w', encoding='utf8') as f:
+        json_data = json.dumps(dictionary)
         f.write(json_data)
 
-def read_data():
-    global tasks
-    with open('data.json', 'r', encoding='utf8') as f:
+def read_from_file(file_name, dictionary):
+    with open(file_name, 'r', encoding='utf8') as f:
         json_input = f.read()
         info = json.loads(json_input)
-        print(tasks)
+        print(dictionary)
         for key, item in info.items():
-            tasks[int(key)] = item
-        print(tasks)
+            dictionary[int(key)] = item
+        print(dictionary)
 
 tasks = {}
-read_data()
+#read_from_file('data.json', tasks)
+
+settings = {}
+#read_from_file('settings.json', settings)
 
 days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
@@ -103,12 +105,34 @@ def main_menu_keyboard():
 #--СПИСОК КОМАНД--
 @main_router.message(Command("start"))
 async def start(message: Message): #обозначаем что мы дадим в функцию(какой тип данных)
-    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
     if message.chat.id not in tasks:
         tasks[message.chat.id] = []
-        save_data()
+        settings[message.chat.id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
+        save_to_file('data.json', tasks)
+        save_to_file('settings.json', settings)
+        await message.answer("Выберите часовой пояс:", reply_markup=timezone_keyboard())
+    else:
+        await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
 
+#клавиатура часвого пояса в начале
+def timezone_keyboard():
+    kb = InlineKeyboardBuilder()
+    for number in ["-2", "-1", "+0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10"]:
+        kb.button(text=f"🌍 UTC{number}", callback_data=f"utc_{number}")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.adjust(3, 3, 3, 3, 2)
+    return kb.as_markup()
+
+@main_router.callback_query(F.data.startswith ("utc_")) #тут доделать
+async def utc_selection(call: CallbackQuery):
+    await safe_delete(call.message)
+    number = int(call.data.split("_")[1])
+    tg_id = call.from_user.id
+    settings[tg_id]['timezone'] = number
+    print(settings)
+    save_to_file('settings.json', settings)
+    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
 @main_router.message(Command("help"))
 async def help(message: Message):
@@ -242,7 +266,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
-    save_data()
+    save_to_file('data.json', tasks)
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
@@ -267,7 +291,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
-    save_data()
+    save_to_file('data.json', tasks)
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
