@@ -31,10 +31,9 @@ import json
 #если пользователь остановился на моменте создания задачи и потом вернулся заново и попытался задачу добавить(в новой сессии запуска бота), то вылетает ошибка потому что не находит предыдущие внесенные ключи
 
 #сделать вывод задач сегодня\на неделю
+#если вместо кнопок написал сообщение(где дефолтный часовой пояс) нужно уведомление
 
-#сделать по-умолчанию: часовой пояс, сортировку, формат вывода
-#сделать команду меню
-#починить настройки вначале
+#добавила команду меню и вывода всех действующих настроек; пофиксила баги; отредактировала текст бота и сделала красивей; доделала кнопки настроек
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -65,11 +64,25 @@ def read_from_file(file_name, dictionary):
 tasks = {}
 #read_from_file('data.json', tasks)
 
-settings = {}
+
+settings_default = {}
 #read_from_file('settings.json', settings)
 
 days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-
+settings_transcript = {
+    "timezone":{
+        0: "МСК", -1: "МСК-1", 2: "МСК+1", 3: "МСК+2", 4: "МСК+3", 5: "МСК+4",
+        6: "МСК+5", 7: "МСК+6", 8: "МСК+7", 9: "МСК+8", 10: "МСК+9"},
+    "sort":{
+        1: "По порядку",
+        2: "По названию",
+        3: "По дате",
+        4: "По времени"},
+    "format_output": {
+        1: "Все задачи",
+        2: "Задачи на неделю",
+        3: "Задачи сегодня"}
+    }
 
 # функция удаления предыдущего сообщения
 async def delete_last_message(last_msg_id: int, message: Message):
@@ -106,43 +119,71 @@ def main_menu_keyboard():
 @main_router.message(Command("start"))
 async def start(message: Message): #обозначаем что мы дадим в функцию(какой тип данных)
     if message.chat.id not in tasks:
-        tasks[message.chat.id] = []
-        settings[message.chat.id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
+        tasks[message.chat.id] = [] #тут сохраняется строка
+        tg_id = message.from_user.id #тут сохраняется число
+        settings_default[tg_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
         save_to_file('data.json', tasks)
-        save_to_file('settings.json', settings)
-        await message.answer("Выберите часовой пояс:", reply_markup=timezone_keyboard())
+        save_to_file('settings.json', settings_default)
+        await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания.\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
     else:
-        await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+        await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
 
 #клавиатура часвого пояса в начале
 def timezone_keyboard():
     kb = InlineKeyboardBuilder()
-    for number in ["-2", "-1", "+0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10"]:
-        kb.button(text=f"🌍 UTC{number}", callback_data=f"utc_{number}")
-    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
-    kb.adjust(3, 3, 3, 3, 2)
+    for number in ["-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9"]:
+        if number == "0":
+            kb.button(text=f"🌍 МСК", callback_data=f"default_utc_{number}")
+        else:
+            kb.button(text=f"🌍 МСК{number}", callback_data=f"default_utc_{number}")
+    kb.adjust(3, 3, 3, 2)
     return kb.as_markup()
 
-@main_router.callback_query(F.data.startswith ("utc_")) #тут доделать
-async def utc_selection(call: CallbackQuery):
+#сохранение часового пояса по умолчанию
+@main_router.callback_query(F.data.startswith ("default_utc_"))
+async def utc_selection_default(call: CallbackQuery):
     await safe_delete(call.message)
-    number = int(call.data.split("_")[1])
+    number = int(call.data.split("_")[2])
     tg_id = call.from_user.id
-    settings[tg_id]['timezone'] = number
-    print(settings)
-    save_to_file('settings.json', settings)
-    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    settings_default[tg_id]['timezone'] = number
+    print(settings_default)
+    save_to_file('settings.json', settings_default)
+    await call.answer("Настройки применены!")
+    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+
+
+
 
 @main_router.message(Command("help"))
 async def help(message: Message):
-    await message.answer("Список доступных команд бота: \n/start\n/help")
+    await message.answer("Список доступных команд бота: \n/start\n/menu\n/help\n/settings")
+
+@main_router.message(Command("menu"))
+async def menu(message: Message):
+    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+
+def settings_output(tg_id):
+    tz = settings_default[tg_id]['timezone']
+    srt = settings_default[tg_id]['sort']
+    form_out = settings_default[tg_id]['format_output']
+    return f'⚙️ Ваши настройки:\n\n🌍 Часовой пояс: {settings_transcript["timezone"][tz]}\n📌 Сортировка: {settings_transcript["sort"][srt]}\n📄 Формат вывода задач: {settings_transcript["format_output"][form_out]}\n\nЧтобы изменить параметры, откройте раздел «Настройки» в главном меню.'
+
+
+#вывод настроек пользователя
+@main_router.message(Command("settings"))
+async def settings(message: Message):
+    tg_id = message.from_user.id
+    await message.answer(settings_output(tg_id))
+    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
 # создание подсказать к командам при вводе /
 async def set_bot_commands(bot):
     commands = [
-        BotCommand(command="start", description="Показать меню"),
-        BotCommand(command="help", description="Список команд")
+        BotCommand(command="start", description="Запустить бота"),
+        BotCommand(command="menu", description="Показать меню"),
+        BotCommand(command="help", description="Список команд"),
+        BotCommand(command="settings", description="Активные настройки")
     ]
     await bot.set_my_commands(commands) # отправляем телеграм список команд бота
 
@@ -719,89 +760,113 @@ def settings_menu_keyboard():
 #клавиатура видов сортировки
 def sorting_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="🔤 По названию", callback_data="sort_name")
-    kb.button(text="📅 По дате", callback_data="sort_date")
-    kb.button(text="⏰ По времени", callback_data="sort_time")
+    kb.button(text="📁 По порядку", callback_data="sort_1")
+    kb.button(text="🔤 По названию", callback_data="sort_2")
+    kb.button(text="📅 По дате", callback_data="sort_3")
+    kb.button(text="⏰ По времени", callback_data="sort_4")
     kb.button(text="⬅️ Назад", callback_data="cancel_setting")
-    kb.adjust(2, 2)
+    kb.adjust(2, 2, 1)
     return kb.as_markup()
 
 #клавиатура выбора часового пояса
 def time_zone_keyboard():
     kb = InlineKeyboardBuilder()
-    for number in ["-2", "-1", "+0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9", "+10"]:
-        kb.button(text=f"🌍 UTC{number}", callback_data=f"utc{number}")
+    for number in ["-1", "0", "+1", "+2", "+3", "+4", "+5", "+6", "+7", "+8", "+9"]:
+        if number == "0":
+            kb.button(text=f"🌍 МСК", callback_data=f"utc_{number}")
+        else:
+            kb.button(text=f"🌍 МСК{number}", callback_data=f"utc_{number}")
     kb.button(text="⬅️ Назад", callback_data="cancel_setting")
-    kb.adjust(3, 3, 3, 3, 2)
+    kb.adjust(3, 3, 3, 3)
     return kb.as_markup()
 
 #клавиатура формата вывода
 def format_output_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="📝 Задачи на сегодня", callback_data="task_today")
-    kb.button(text="📅 Задачи на неделю", callback_data="task_week")
-    kb.button(text="♾️ Все задачи", callback_data="task_all")
+    kb.button(text="♾️ Все задачи", callback_data="task_1")
+    kb.button(text="📅 Задачи на неделю", callback_data="task_2")
+    kb.button(text="📝 Задачи на сегодня", callback_data="task_3")
     kb.button(text="⬅️ Назад", callback_data="cancel_setting")
     kb.adjust(2, 2)
     return kb.as_markup()
 
 #-ФУНКЦИИ КЛАВИАТУРЫ-
-
-#вывод на сегодня
-@main_router.callback_query(F.data == "task_today") #доделать
-async def task_today(call: CallbackQuery):
-    pass
-
-#вывод на неделю
-@main_router.callback_query(F.data == "task_week") #доделать
-async def task_week(call: CallbackQuery):
-    pass
-
-#вывод всех задач
-@main_router.callback_query(F.data == "task_all") #доделать
+#вывод задач
+@main_router.callback_query(F.data.startswith ("task_")) #доделать
 async def task_all(call: CallbackQuery):
     await safe_delete(call.message)
-    await call.message.answer("Вывод задач будет общий")
+    number = int(call.data.split("_")[1])
+    tg_id = call.from_user.id
+    if settings_default[tg_id]['format_output'] == number:
+        await call.answer("Такая настройка уже выбрана")
+        await call.message.answer("Выберите действие:", reply_markup=format_output_keyboard())
+        return
+    formats = {
+        1: "все задачи",
+        2: "задачи на неделю",
+        3: "задачи на сегодня"
+    }
+    await call.message.answer(
+        "⚙️ Настройки обновлены\n\n"
+        "Изменено:\n"
+        f"📄 Формат вывода — {formats[number]}"
+    )
+    settings_default[tg_id]['format_output'] = number
+    save_to_file('settings.json', settings_default)
+    print(settings_default)
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await call.answer()
 
-#сортировка по названию
-@main_router.callback_query(F.data == "sort_name")
+#сортировка
+@main_router.callback_query(F.data.startswith ("sort_"))
 async def sort_name(call: CallbackQuery):
     await safe_delete(call.message)
-
+    number = int(call.data.split("_")[1])
     #сделать постоянную сортировку
-
-    await call.message.answer("Теперь ваш список сортируется по названию!")
+    tg_id = call.from_user.id
+    if settings_default[tg_id]['sort'] == number:
+        await call.answer("Такая настройка уже выбрана")
+        await call.message.answer("Выберите действие:", reply_markup=sorting_keyboard())
+        return
+    sorts = {
+        1: "по порядку",
+        2: "по названию",
+        3: "по дате",
+        4: "по времени"
+    }
+    await call.message.answer(
+        "⚙️ Настройки обновлены\n\n"
+        "Изменено:\n"
+        f"📌 Сортировка — {sorts[number]}"
+    )
+    settings_default[tg_id]['sort'] = number
+    save_to_file('settings.json', settings_default)
+    print(settings_default)
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await call.answer()
 
-#сортировка по дате
-@main_router.callback_query(F.data == "sort_date")
-async def sort_date(call: CallbackQuery):
-    await safe_delete(call.message)
-
-    # сделать постоянную сортировку
-
-    await call.message.answer("Теперь ваш список сортируется по дате!")
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-    await call.answer()
-
-#сортировка по времени
-@main_router.callback_query(F.data == "sort_time")
-async def sort_time(call: CallbackQuery):
-    await safe_delete(call.message)
-
-    # сделать постоянную сортировку
-
-    await call.message.answer("Теперь ваш список сортируется по времени!")
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-    await call.answer()
 
 #выбор часового пояса
-@main_router.callback_query(F.data.startswith ("utc")) #тут доделать
+@main_router.callback_query(F.data.startswith ("utc_")) #тут доделать
 async def utc_selection(call: CallbackQuery):
-    pass
+    await safe_delete(call.message)
+    number = int(call.data.split("_")[1])
+    tg_id = call.from_user.id
+    if settings_default[tg_id]['timezone'] == number:
+        await call.answer("Такая настройка уже выбрана")
+        await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
+        return
+    settings_default[tg_id]['timezone'] = number
+    save_to_file('settings.json', settings_default)
+    tz_text = f"МСК{number:+}" if number != 0 else "МСК"
+    await call.message.answer(
+        "⚙️ Настройки обновлены\n\n"
+        "Изменено:\n"
+        f"🌍 Часовой пояс — {tz_text}"
+    )
+    print(settings_default)
+    await call.answer()
+    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
 #-ФОРМАТ ВЫВОДА-
 @main_router.callback_query(F.data == "format_output")
