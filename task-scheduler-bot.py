@@ -19,7 +19,6 @@ import os
 import json
 
 
-#настроить выбор часового пояса в самом начале использования и потом менять в настройках
 #сделать напоминания по времени
 #доделать кнопку изменения
 #подключить бд
@@ -30,10 +29,9 @@ import json
 #если пишу часы текстом, то сообщение дает уведу но не удаляет предыдущ сообщение, если пользователь на середине нажжал на старт то может продолжить создание задачи и потом выдает ошибку
 #если пользователь остановился на моменте создания задачи и потом вернулся заново и попытался задачу добавить(в новой сессии запуска бота), то вылетает ошибка потому что не находит предыдущие внесенные ключи
 
+#доделать баг с временем прошлым
 #сделать вывод задач сегодня\на неделю
-#если вместо кнопок написал сообщение(где дефолтный часовой пояс) нужно уведомление
-
-#добавила команду меню и вывода всех действующих настроек; пофиксила баги; отредактировала текст бота и сделала красивей; доделала кнопки настроек
+#доделать изменение задач, я не понимаю как подключить старые кнопки как при добавлении
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -48,25 +46,31 @@ dp.include_router(main_router) #добавляет роутер в поле зр
 
 # Запись и чтение в JSON
 def save_to_file(file_name, dictionary):
-    with open(file_name, 'w', encoding='utf8') as f:
-        json_data = json.dumps(dictionary)
-        f.write(json_data)
+    try:
+        with open(file_name, 'w', encoding='utf8') as f:
+            json_data = json.dumps(dictionary)
+            f.write(json_data)
+    except Exception as e:
+        print("Ошибка, при сохранении файла")
 
 def read_from_file(file_name, dictionary):
-    with open(file_name, 'r', encoding='utf8') as f:
-        json_input = f.read()
-        info = json.loads(json_input)
-        print(dictionary)
-        for key, item in info.items():
-            dictionary[int(key)] = item
-        print(dictionary)
+    try:
+        with open(file_name, 'r', encoding='utf8') as f:
+            json_input = f.read()
+            info = json.loads(json_input)
+            print(dictionary)
+            for key, item in info.items():
+                dictionary[int(key)] = item
+            print(dictionary)
+    except Exception as e:
+        print("Произошла ошибка, при считывании файла:", e)
 
 tasks = {}
-#read_from_file('data.json', tasks)
+read_from_file('data.json', tasks)
 
 
 settings_default = {}
-#read_from_file('settings.json', settings)
+read_from_file('settings.json', settings_default)
 
 days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 settings_transcript = {
@@ -116,18 +120,34 @@ def main_menu_keyboard():
 
 
 #--СПИСОК КОМАНД--
+class Auth(StatesGroup):
+    timezone = State()
+
 @main_router.message(Command("start"))
-async def start(message: Message): #обозначаем что мы дадим в функцию(какой тип данных)
+async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)
     if message.chat.id not in tasks:
         tasks[message.chat.id] = [] #тут сохраняется строка
         tg_id = message.from_user.id #тут сохраняется число
         settings_default[tg_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
         save_to_file('data.json', tasks)
         save_to_file('settings.json', settings_default)
-        await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания.\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
+        bot_msg = await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания.\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
+        await state.update_data(start_msg=bot_msg.message_id)
+        await state.set_state(Auth.timezone)
     else:
         await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
+@main_router.message(Auth.timezone)
+async def ignore_timezone(message: Message, state: FSMContext):
+    bot_msg = await message.answer(
+        "Пожалуйста, выберите часовой пояс с помощью кнопок ниже 👇", reply_markup=timezone_keyboard()
+    )
+    data = await state.get_data()
+    start_msg = data.get("start_msg")
+    last_msg_id = data.get("last_msg_id")
+    await delete_last_message(start_msg, message)
+    await delete_last_message(last_msg_id, message)
+    await state.update_data(last_msg_id=bot_msg.message_id)
 
 #клавиатура часвого пояса в начале
 def timezone_keyboard():
@@ -142,7 +162,7 @@ def timezone_keyboard():
 
 #сохранение часового пояса по умолчанию
 @main_router.callback_query(F.data.startswith ("default_utc_"))
-async def utc_selection_default(call: CallbackQuery):
+async def utc_selection_default(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[2])
     tg_id = call.from_user.id
@@ -150,9 +170,8 @@ async def utc_selection_default(call: CallbackQuery):
     print(settings_default)
     save_to_file('settings.json', settings_default)
     await call.answer("Настройки применены!")
+    await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-
-
 
 
 @main_router.message(Command("help"))
@@ -161,7 +180,7 @@ async def help(message: Message):
 
 @main_router.message(Command("menu"))
 async def menu(message: Message):
-    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
 def settings_output(tg_id):
     tz = settings_default[tg_id]['timezone']
@@ -343,7 +362,6 @@ async def cap(call: CallbackQuery):
     await call.answer("Ошибка, попробуйте снова")
 
 
-
 #если нажмет на стрелочку вперед
 @main_router.callback_query(F.data == "next_month")
 async def next_month(call: CallbackQuery, state: FSMContext):
@@ -506,7 +524,7 @@ async def get_name(message: Message, state: FSMContext): #название за�
     name = message.text #то что получили кладем в переменную
     # получаем текущую дату
     current_datetime = datetime.now()
-    current_day = current_datetime.day  # сделать если нажмет меньше этой даты и в том же месяце того же года ошибку
+    current_day = current_datetime.day
     current_month = current_datetime.month
     current_year = current_datetime.year
 
@@ -527,7 +545,7 @@ async def get_name(message: Message, state: FSMContext): #название за�
 @main_router.message(AddTask.date)
 async def get_date(message: Message, state: FSMContext):
     bot_msg = await message.answer(
-        "Пожалуйста, выберите время с помощью кнопок ниже 👇", reply_markup=get_date_keyboard()
+        "Пожалуйста, выберите дату с помощью кнопок ниже 👇", reply_markup=get_date_keyboard()
     )
     data = await state.get_data()
     last_msg_id = data.get("last_msg_id")
@@ -537,7 +555,6 @@ async def get_date(message: Message, state: FSMContext):
 # добавляем время
 @main_router.message(AddTask.time)
 async def ignore_time_text(message: Message, state: FSMContext):
-
     bot_msg = await message.answer(
         "Пожалуйста, выберите время с помощью кнопок ниже 👇", reply_markup=get_time_hour_keyboard()
     )
@@ -654,19 +671,36 @@ def convert_selected_days_to_str(selected_days):
     return result
 
 #--ФУНКЦИЯ ВЫВОДА--
-def output_task(tg_id: int):
+#вывод по порядку
+def output_task(tg_id: int, cap="0"):
     tasks_list = ["📌 Список дел:"]
     for idx, task in enumerate(tasks[tg_id], 1):
         period = task["period"]
+        notification = task["notification"]
         if isinstance(period, list):
             period_str = ", ".join(period) if period else "Без повторений"
         else:
             period_str = period
-        task_text = f'{idx}) {task["name"].capitalize()} - {task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}'
+        #тут не работает почему-то
+        if notification == 10 or notification == 30:
+            notification =  f'Напоминать за {notification} минут.'
+        elif notification == 60:
+            notification = f'Напоминать за 1 час.'
+        elif notification == 120:
+            notification = f'Напоминать за 2 часа.'
+        if cap == "1":
+            task_text = f'{idx}) {task["name"].capitalize()} - {task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}. {notification}'
+        else:
+            task_text = f'{idx}) {task["name"].capitalize()} - {task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}'
         tasks_list.append(task_text)
     full_message = '\n\n'.join(tasks_list)
     return full_message
 
+def output_task_week(tg_id: int): #тут будет вывод на неделю
+    pass
+
+def output_task_today(tg_id: int): #тут будет вывод на сегодня
+    pass
 
 @main_router.callback_query(F.data == "output")
 async def output(call: CallbackQuery):
@@ -677,9 +711,12 @@ async def output(call: CallbackQuery):
         await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await call.answer()
     else:
-
-
-        out = output_task(tg_id)
+        if settings_default[tg_id]["format_output"] == 1:
+            out = output_task(tg_id)
+        elif settings_default[tg_id]["format_output"] == 2:
+            out = output_task_week(tg_id)
+        elif settings_default[tg_id]["format_output"] == 3:
+            out = output_task_today(tg_id)
         await call.message.answer(out)
         await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await call.answer()
@@ -688,9 +725,80 @@ async def output(call: CallbackQuery):
 
 #--ИЗМЕНЕНИЕ--
 @main_router.callback_query(F.data == "change") #делаем клавиатуру состоящую из всех уже сохраненных задач(кол-во кнопок зависит от этого)
-async def edit_task(call: CallbackQuery):
+async def edit_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    await call.message.answer("Вы нажали на изменение списка")
+    tg_id = call.from_user.id
+    if len(tasks[tg_id]) == 0:
+        await call.message.answer("😊 Нет задач, которые можно изменить")
+        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await call.answer()
+    else:
+        tasks_list = output_task(tg_id, cap="1")
+        tasks_message = await call.message.answer(tasks_list)
+        await state.update_data(tasks_message_id=tasks_message.message_id)
+        await call.message.answer(f"Выберите задачу, которую желаете изменить:",
+                                  reply_markup=edit_task_keyboard(tg_id))
+        await call.answer()
+
+#-КЛАВИАТУРА-
+def edit_task_keyboard(tg_id: int):
+    kb = InlineKeyboardBuilder()
+    for i in range(1, len(tasks[tg_id]) + 1):
+        kb.button(text=f"{i}", callback_data=f"edit_task_{i}")
+    count = len(tasks[tg_id])
+    if count <= 4:
+        kb.adjust(1)
+    elif count <= 10:
+        kb.adjust(2)
+    else:
+        kb.adjust(3)
+    return kb.as_markup()
+
+def task_change_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Название", callback_data="edit_name")
+    kb.button(text="Дата", callback_data="edit_date")
+    kb.button(text="Время", callback_data="edit_time")
+    kb.button(text="Период", callback_data="edit_period")
+    kb.button(text="Напоминание", callback_data="edit_notification")
+    kb.button(text="Назад", callback_data="undo_the_change")
+    kb.adjust(2, 2, 2)
+    return kb.as_markup()
+
+#-ФУНКЦИИ КЛАВИАТУРЫ-
+#отмена изменения
+@main_router.callback_query(F.data == "undo_the_change")
+async def undo_the_change(call: CallbackQuery):
+    await safe_delete(call.message)
+    await call.answer("Изменение отменено!")
+    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await call.answer()
+
+#что именно меняем
+@main_router.callback_query(F.data.startswith("edit_task_"))
+async def edit_number_task(call: CallbackQuery, state: FSMContext):
+    await safe_delete(call.message)
+    number_task = int(call.data.split("_")[2])
+    await state.update_data(number_task=number_task)
+    await call.message.answer("Что именно в задаче вы желаете изменить?", reply_markup=task_change_keyboard())
+    await call.answer()
+
+#изменение (тут доделать само изменение)
+@main_router.callback_query(F.data.startswith("edit_"))
+async def edit(call: CallbackQuery, state: FSMContext):
+    await safe_delete(call.message)
+    item = call.data.split("_")[1] #что именно меняем
+    data = await state.get_data()
+    tasks_message = data.get("tasks_message_id")
+    await call.bot.delete_message(chat_id=call.message.chat.id,
+                                  message_id=tasks_message)
+    number_task = data.get("number_task") #номер задачи
+    tg_id = call.from_user.id
+    #tasks[tg_id][number_task - 1][item]
+
+    await call.message.answer("✅ Задача успешно изменена!")
+    print(tasks)
+    await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await call.answer()
 
@@ -753,7 +861,7 @@ def settings_menu_keyboard():
     kb.button(text="📁 Сортировка", callback_data="sorting")
     kb.button(text="🕰️ Часовой пояс", callback_data="timezone")
     kb.button(text="📊 Формат вывода", callback_data="format_output")
-    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting_menu")
     kb.adjust(2, 2)
     return kb.as_markup()
 
@@ -764,7 +872,7 @@ def sorting_keyboard():
     kb.button(text="🔤 По названию", callback_data="sort_2")
     kb.button(text="📅 По дате", callback_data="sort_3")
     kb.button(text="⏰ По времени", callback_data="sort_4")
-    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting_back")
     kb.adjust(2, 2, 1)
     return kb.as_markup()
 
@@ -776,7 +884,7 @@ def time_zone_keyboard():
             kb.button(text=f"🌍 МСК", callback_data=f"utc_{number}")
         else:
             kb.button(text=f"🌍 МСК{number}", callback_data=f"utc_{number}")
-    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting_back")
     kb.adjust(3, 3, 3, 3)
     return kb.as_markup()
 
@@ -786,7 +894,7 @@ def format_output_keyboard():
     kb.button(text="♾️ Все задачи", callback_data="task_1")
     kb.button(text="📅 Задачи на неделю", callback_data="task_2")
     kb.button(text="📝 Задачи на сегодня", callback_data="task_3")
-    kb.button(text="⬅️ Назад", callback_data="cancel_setting")
+    kb.button(text="⬅️ Назад", callback_data="cancel_setting_back")
     kb.adjust(2, 2)
     return kb.as_markup()
 
@@ -889,11 +997,15 @@ async def time_zone(call: CallbackQuery):
     await call.message.answer("Выберите ваш часовой пояс:", reply_markup=time_zone_keyboard())
 
 #-ВЕРНУТЬСЯ НАЗАД-
-@main_router.callback_query(F.data == "cancel_setting")
+@main_router.callback_query(F.data.startswith("cancel_setting_menu"))
 async def cancel_setting(call: CallbackQuery):
+    comm = call.data.split("_")[2]
     await safe_delete(call.message)
     await call.answer("Возвращаемся назад...")
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    if comm == "menu":
+        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    else:
+        await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
     await call.answer()
 
 
