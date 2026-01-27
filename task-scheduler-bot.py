@@ -29,9 +29,11 @@ import json
 #если пишу часы текстом, то сообщение дает уведу но не удаляет предыдущ сообщение, если пользователь на середине нажжал на старт то может продолжить создание задачи и потом выдает ошибку
 #если пользователь остановился на моменте создания задачи и потом вернулся заново и попытался задачу добавить(в новой сессии запуска бота), то вылетает ошибка потому что не находит предыдущие внесенные ключи
 
-#доделать баг с временем прошлым
 #сделать вывод задач сегодня\на неделю
 #доделать изменение задач, я не понимаю как подключить старые кнопки как при добавлении
+#в amvera не обновляется data при добавлении
+
+#исправила баг, теперь нельзя выбирать прошедшее время;
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -228,29 +230,51 @@ async def add_task(call: CallbackQuery, state: FSMContext):
 
 # часы 1 часть
 @main_router.callback_query(F.data == "next_hour")
-async def next_hour(call: CallbackQuery, state: FSMContext):
+async def next_hour(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2))
 
 # часы 2 часть
 @main_router.callback_query(F.data == "prev_hour")
-async def prev_hour(call: CallbackQuery, state: FSMContext):
+async def prev_hour(call: CallbackQuery):
     await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1))
 
 # минуты
 @main_router.callback_query(F.data.startswith("hour_"))
 async def hour_task(call: CallbackQuery, state: FSMContext):
     hour = call.data.split("_")[1]
+    data = await state.get_data()
+    today_date = data.get("real_date_str")
+    selected_date = data.get("date")
+    now = datetime.now()
+    today_time = now.strftime("%H:%M:%S").split(":")
     if len(hour) == 1:
         hour = "0" + hour
+    same_hour = 0
+    if today_date == selected_date:
+        if today_time[0] == hour:
+            same_hour = 1 #если час такой же как сейчас
+        elif today_time[0] > hour:
+            await call.answer("Час уже прошел, попробуйте снова")
+            return
+    await state.update_data(same_hour=same_hour)
     await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour))
 
 # переход от времени к периоду
 @main_router.callback_query(F.data.startswith("time_"))
 async def time_task(call: CallbackQuery, state: FSMContext):
     time = call.data.split("_")[1]
+    minute = time.split(":")[1]
     data = await state.get_data()
     last_msg_id = data.get("last_msg_id")
+    same_hour = data.get("same_hour")
     await safe_delete(call.message)
+    now = datetime.now()
+    today_time = now.strftime("%H:%M:%S").split(":")
+    if same_hour == 1 and int(today_time[1]) >= int(minute):
+        await call.answer("Время уже прошло, попробуйте снова")
+        await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_hour_keyboard(1))
+        await call.answer()
+        return
     #await delete_last_message(last_msg_id, call.message)
     selected = [0, 0, 0, 0, 0, 0, 0]
     bot_msg = await call.message.answer("По каким дням недели будет повторяться задача?:",
@@ -421,11 +445,12 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
     if real_date_day > date_day and date_month == real_date_month and real_date_year == date_year:
         await call.answer("Дата уже прошла, попробуйте снова")
         return
+    real_date_str = f"{real_date_day}.{real_date_month}.{real_date_year}"
     date_str = f"{date_day}.{date_month}.{date_year}"
-    await state.update_data(date=date_str)
+    await state.update_data(date=date_str, real_date_str=real_date_str)
     await safe_delete(call.message)
     await state.set_state(AddTask.time)
-    await call.message.answer("Напишите время выполнения задачи в формате ЧЧ:ММ:", reply_markup=get_time_hour_keyboard())
+    await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_hour_keyboard())
     await call.answer()
 
 
@@ -741,7 +766,7 @@ async def edit_task(call: CallbackQuery, state: FSMContext):
         await call.answer()
 
 #-КЛАВИАТУРА-
-def edit_task_keyboard(tg_id: int):
+def edit_task_keyboard(tg_id: int): #вывод имеющихся задач
     kb = InlineKeyboardBuilder()
     for i in range(1, len(tasks[tg_id]) + 1):
         kb.button(text=f"{i}", callback_data=f"edit_task_{i}")
@@ -784,24 +809,35 @@ async def edit_number_task(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 #изменение (тут доделать само изменение)
-@main_router.callback_query(F.data.startswith("edit_"))
+@main_router.callback_query(F.data == "edit_name")
 async def edit(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    item = call.data.split("_")[1] #что именно меняем
     data = await state.get_data()
     tasks_message = data.get("tasks_message_id")
     await call.bot.delete_message(chat_id=call.message.chat.id,
                                   message_id=tasks_message)
     number_task = data.get("number_task") #номер задачи
     tg_id = call.from_user.id
-    #tasks[tg_id][number_task - 1][item]
-
-    await call.message.answer("✅ Задача успешно изменена!")
+    bot_msg = await call.message.answer("Напишите название задачи:")
+    new_name = get_new_name(bot_msg)
+    tasks[tg_id][number_task - 1]['name'] = new_name
+    await call.message.answer("✅ Название задачи успешно изменено!")
     print(tasks)
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await call.answer()
 
+class EditTask(StatesGroup):
+    name = State()
+    date = State()
+    time = State()
+    period = State()
+    notification = State()
+
+@main_router.message(EditTask.name)
+async def get_new_name(message: Message):
+    name = message.text
+    return name
 
 #--ОЧИЩЕНИЕ--
 @main_router.callback_query(F.data == "clear")
