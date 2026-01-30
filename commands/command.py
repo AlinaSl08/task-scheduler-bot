@@ -12,8 +12,8 @@ from keyboards.main_kb import main_menu_keyboard
 
 
 commands_router = Router()
-path_to_data = 'data/data.json'
-path_to_settings = 'data/settings.json'
+path_to_data = '/data/data.json'
+path_to_settings = '/data/settings.json'
 
 read_from_file(path_to_data, tasks)
 read_from_file(path_to_settings, settings_default)
