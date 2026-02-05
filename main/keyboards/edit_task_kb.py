@@ -1,5 +1,5 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from storage.tasks import tasks
+from main.storage.tasks import tasks
 
 def edit_task_keyboard(tg_id: int): #вывод имеющихся задач
     kb = InlineKeyboardBuilder()

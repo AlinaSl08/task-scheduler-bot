@@ -1,10 +1,10 @@
 from aiogram.types import CallbackQuery
 from aiogram import Router, F
-from utils.delete_last_message import safe_delete
-from keyboards.main_kb import main_menu_keyboard
-from keyboards.settings_kb import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
-from storage.tasks import settings_default
-from database.db import save_to_file
+from main.utils import safe_delete
+from main.keyboards.main_kb import main_menu_keyboard
+from main.keyboards import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
+from main.storage import settings_default
+from main.database import save_to_file
 
 settings_router = Router()
 

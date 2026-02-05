@@ -1,14 +1,14 @@
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
-from states.add_task import AddTask
+from main.states.add_task import AddTask
 from datetime import datetime
-from utils.delete_last_message import safe_delete, delete_last_message
-from database.db import save_to_file
-from keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get_time_minute_keyboard, get_period_keyboard, get_notification_keyboard
-from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import tasks
-from commands.command import path_to_data
+from main.utils import safe_delete, delete_last_message
+from main.database import save_to_file
+from main.keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get_time_minute_keyboard, get_period_keyboard, get_notification_keyboard
+from main.keyboards.main_kb import main_menu_keyboard
+from main.storage import tasks
+from main.commands import path_to_data
 
 add_task_router = Router()
 
