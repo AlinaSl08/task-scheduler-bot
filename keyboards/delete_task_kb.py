@@ -1,5 +1,5 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from main.storage.tasks import tasks
+from storage.tasks import tasks
 
 def delete_task_keyboard(tg_id: int):
     kb = InlineKeyboardBuilder()

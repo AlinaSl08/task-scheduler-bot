@@ -1,4 +1,4 @@
-.env
+../.env
 .idea/
 backup_*.py
 __pycache__/

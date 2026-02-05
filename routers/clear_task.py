@@ -1,9 +1,9 @@
 from aiogram.types import CallbackQuery
 from aiogram import Router, F
-from main.utils import safe_delete
-from main.keyboards.main_kb import main_menu_keyboard
-from main.storage import tasks
-from main.keyboards import confirm_clear_keyboard
+from utils import safe_delete
+from keyboards.main_kb import main_menu_keyboard
+from storage import tasks
+from keyboards import confirm_clear_keyboard
 
 clear_task_router = Router()
 

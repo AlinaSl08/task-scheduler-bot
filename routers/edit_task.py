@@ -1,11 +1,11 @@
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
-from main.utils import safe_delete
-from main.keyboards.main_kb import main_menu_keyboard
-from main.storage import tasks
-from main.keyboards.edit_task_kb import edit_task_keyboard, task_change_keyboard
-from main.routers.output_task import output_task
+from utils import safe_delete
+from keyboards.main_kb import main_menu_keyboard
+from storage import tasks
+from keyboards.edit_task_kb import edit_task_keyboard, task_change_keyboard
+from routers.output_task import output_task
 
 edit_task_router = Router()
 

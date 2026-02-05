@@ -3,12 +3,12 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BotCommand
 from aiogram.types import Message, CallbackQuery
-from main.storage.tasks import tasks, settings_default
-from main.database.db import read_from_file, save_to_file
-from main.commands.commands_kb import timezone_keyboard
-from main.utils.delete_last_message import delete_last_message, safe_delete
-from main.states.auth import Auth
-from main.keyboards.main_kb import main_menu_keyboard
+from storage.tasks import tasks, settings_default
+from database.db import read_from_file, save_to_file
+from commands.commands_kb import timezone_keyboard
+from utils.delete_last_message import delete_last_message, safe_delete
+from states.auth import Auth
+from keyboards.main_kb import main_menu_keyboard
 
 
 commands_router = Router()

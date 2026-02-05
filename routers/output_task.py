@@ -1,7 +1,8 @@
 from aiogram.types import CallbackQuery
-from main.utils import safe_delete
-from main.keyboards.main_kb import main_menu_keyboard
-from main.storage import tasks, settings_default
+from utils import safe_delete
+from keyboards.main_kb import main_menu_keyboard
+from storage import settings_default
+from storage import tasks
 from aiogram import Router, F
 
 output_task_router = Router()
