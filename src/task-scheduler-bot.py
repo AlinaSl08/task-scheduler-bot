@@ -8,12 +8,12 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram import Router
 from routers.add_task import add_task_router
-from routers import delete_task_router
-from routers import output_task_router
-from routers import edit_task_router
-from routers import clear_task_router
+from routers.delete_task import delete_task_router
+from routers.output_task import output_task_router
+from routers.edit_task import edit_task_router
+from routers.clear_task import clear_task_router
 from routers.settings import settings_router
-from commands import commands_router, set_bot_commands
+from commands.command import commands_router, set_bot_commands
 
 #сделать напоминания по времени
 #подключить бд

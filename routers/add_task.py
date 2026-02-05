@@ -3,13 +3,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
 from states.add_task import AddTask
 from datetime import datetime
-from utils import safe_delete
+from utils.delete_last_message import safe_delete
 from utils import delete_last_message
-from database import save_to_file
+from database.db import save_to_file
 from keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get_time_minute_keyboard, get_period_keyboard, get_notification_keyboard
 from keyboards.main_kb import main_menu_keyboard
 from storage import tasks
-from commands import path_to_data
+from commands.command import path_to_data
 
 add_task_router = Router()
 

@@ -1,7 +1,7 @@
 from aiogram.types import CallbackQuery
-from utils import safe_delete
+from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
-from storage import settings_default
+from storage.tasks import settings_default
 from storage import tasks
 from aiogram import Router, F
 
