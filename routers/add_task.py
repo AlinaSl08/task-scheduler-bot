@@ -3,12 +3,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
 from states.add_task import AddTask
 from datetime import datetime
-from utils.delete_last_message import safe_delete
-from utils import delete_last_message
+from utils.delete_last_message import safe_delete, delete_last_message
 from database.db import save_to_file
 from keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get_time_minute_keyboard, get_period_keyboard, get_notification_keyboard
 from keyboards.main_kb import main_menu_keyboard
-from storage import tasks
+from storage.tasks import tasks
 from commands.command import path_to_data
 
 add_task_router = Router()
@@ -242,7 +241,9 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
     real_date_month = data.get("real_current_month")
     real_date_year = data.get("real_current_year")
     real_date_day = data.get("real_current_day")
-
+    print(data)
+    print(real_date_day)
+    print(date_day)
     #если дата уже прошла
     if real_date_day > date_day and date_month == real_date_month and real_date_year == date_year:
         await call.answer("Дата уже прошла, попробуйте снова")
@@ -269,20 +270,23 @@ async def get_name(message: Message, state: FSMContext): #название за�
     real_current_month = current_datetime.month
     real_current_year = current_datetime.year
 
-    bot_msg = await message.answer("Выберите дату выполнения задачи:",
-                                   reply_markup=get_date_keyboard(current_month=current_month, current_year=current_year))
+
     data = await state.get_data()
     last_msg_id = data.get("last_msg_id") #получаем айди предыдущего сообщения
     await delete_last_message(last_msg_id, message)
     # обновить значение(как ключ:значение) и сохранить
-    await state.update_data(name=name, last_msg_id=bot_msg.message_id, current_day=current_day,
+    await state.update_data(name=name, current_day=current_day,
                             current_month=current_month, current_year=current_year, real_current_month=real_current_month,
                             real_current_year=real_current_year, real_current_day=real_current_day)
+    bot_msg = await message.answer("Выберите дату выполнения задачи:",
+                                   reply_markup=get_date_keyboard(current_month=current_month,
+                                                                  current_year=current_year))
+    await state.update_data( last_msg_id=bot_msg.message_id)
     await state.set_state(AddTask.date)
 
 # добавляем дату
 @add_task_router.message(AddTask.date)
-async def get_date(message: Message, state: FSMContext):
+async def ignore_get_date(message: Message, state: FSMContext):
     bot_msg = await message.answer(
         "Пожалуйста, выберите дату с помощью кнопок ниже 👇", reply_markup=get_date_keyboard()
     )
