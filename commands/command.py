@@ -10,13 +10,26 @@ from utils.delete_last_message import delete_last_message, safe_delete
 from states.auth import Auth
 from keyboards.main_kb import main_menu_keyboard
 
+import os
+
+# Базовый путь к папке data
+# На Amvera это будет /data, локально - data
+DATA_DIR = "/data" if "AMVERA" in os.environ else "data"
+
+# Путь к конкретному файлу
+DATA_FILE_PATH = os.path.join(DATA_DIR, "data.json")
+SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")
+
+
+
+
 
 commands_router = Router()
-path_to_data = 'data/data.json'
-path_to_settings = 'data/settings.json'
+#DATA_FILE_PATH = 'data/data.json'
+#SETTINGS_FILE_PATH = 'data/settings.json'
 
-read_from_file(path_to_data, tasks)
-read_from_file(path_to_settings, settings_default)
+read_from_file(DATA_FILE_PATH, tasks)
+read_from_file(SETTINGS_FILE_PATH, settings_default)
 
 
 settings_transcript = {
@@ -40,8 +53,8 @@ async def start(message: Message, state: FSMContext): #обозначаем чт
         tasks[message.chat.id] = [] #тут сохраняется строка
         tg_id = message.from_user.id #тут сохраняется число
         settings_default[tg_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
-        save_to_file(path_to_data, tasks)
-        save_to_file(path_to_settings, settings_default)
+        save_to_file(DATA_FILE_PATH, tasks)
+        save_to_file(SETTINGS_FILE_PATH, settings_default)
         bot_msg = await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания."
                                        "\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
         await state.update_data(start_msg=bot_msg.message_id)
@@ -71,7 +84,7 @@ async def utc_selection_default(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     settings_default[tg_id]['timezone'] = number
     print(settings_default)
-    save_to_file(path_to_settings, settings_default)
+    save_to_file(SETTINGS_FILE_PATH, settings_default)
     await call.answer("Настройки применены!")
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())

@@ -8,7 +8,7 @@ from database.db import save_to_file
 from keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get_time_minute_keyboard, get_period_keyboard, get_notification_keyboard
 from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import tasks
-from commands.command import path_to_data
+from commands.command import DATA_FILE_PATH
 
 add_task_router = Router()
 
@@ -151,7 +151,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
-    save_to_file(path_to_data, tasks)
+    save_to_file(DATA_FILE_PATH, tasks)
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
@@ -176,7 +176,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification})
     print(tasks)
-    save_to_file(path_to_data, tasks)
+    save_to_file(DATA_FILE_PATH, tasks)
     await state.clear()
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
