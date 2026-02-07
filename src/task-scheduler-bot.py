@@ -15,9 +15,9 @@ from routers.clear_task import clear_task_router
 from routers.settings import settings_router
 from commands.command import commands_router, set_bot_commands
 
-#сделать напоминания по времени
+#сделать напоминания по времени (кнопки вып\не вып)
 #подключить бд
-#сделать статистику по выполненным задачам
+#сделать статистику по выполненным задачам(на неделю автомат или по кнопке отчет)
 #доделать изменение задач, я не понимаю как подключить старые кнопки как при добавлении
 #в amvera не обновляется data при добавлении
 

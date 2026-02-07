@@ -9,6 +9,8 @@ from commands.commands_kb import timezone_keyboard
 from utils.delete_last_message import delete_last_message, safe_delete
 from states.auth import Auth
 from keyboards.main_kb import main_menu_keyboard
+from storage.tasks import tasks
+import datetime
 
 import os
 
@@ -19,9 +21,6 @@ DATA_DIR = "/data" if "AMVERA" in os.environ else "data"
 # Путь к конкретному файлу
 DATA_FILE_PATH = os.path.join(DATA_DIR, "data.json")
 SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")
-
-
-
 
 
 commands_router = Router()
@@ -115,12 +114,40 @@ async def settings(message: Message):
     await message.answer(settings_output(tg_id))
     await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
+
+def report_tasks(tg_id): #сделать за прошлую неделю выполненные и везде просроченные, в том числе сегодня по времени datetime.datetime
+    current_date = datetime.date.today()
+    days_till_monday = datetime.date.weekday(current_date)
+    date_monday = current_date - datetime.timedelta(days=days_till_monday)
+    count_completed = 0
+    for task in tasks[tg_id]:
+        day = task["date"]["day"]
+        month = task["date"]["month"]
+        year = task["date"]["year"]
+        completed = task["completed"]
+        task_date = datetime.date(day=day, month=month, year=year)
+        if task_date >= date_monday and completed:
+            count_completed += 1
+    text = f'Выполнено на этой неделе {count_completed} задач!' #модуль который склоняет слова
+    return text
+
+
+@commands_router.message(Command("report"))
+async def report(message: Message):
+    tg_id = message.from_user.id
+    await message.answer(report_tasks(tg_id))
+    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+
+
 # создание подсказать к командам при вводе /
 async def set_bot_commands(bot):
     commands = [
         BotCommand(command="start", description="Запустить бота"),
         BotCommand(command="menu", description="Показать меню"),
         BotCommand(command="help", description="Список команд"),
-        BotCommand(command="settings", description="Активные настройки")
+        BotCommand(command="settings", description="Активные настройки"),
+        BotCommand(command="report", description="Отчет по выполненным задачам")
     ]
     await bot.set_my_commands(commands) # отправляем телеграм список команд бота
+
+
