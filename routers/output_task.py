@@ -3,6 +3,7 @@ from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import settings_default, tasks
 from aiogram import Router, F
+from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
 
 output_task_router = Router()
 
@@ -12,11 +13,13 @@ def output_task(tg_id: int, cap="0"):
     for idx, task in enumerate(tasks[tg_id], 1):
         period = task["period"]
         notification = task["notification"]
+        completed = ""
+        if task["completed"]:
+            completed = " ✅"
         if isinstance(period, list):
             period_str = ", ".join(period) if period else "Без повторений"
         else:
             period_str = period
-        #тут не работает почему-то
         if notification == 10 or notification == 30:
             notification =  f'Напоминать за {notification} минут.'
         elif notification == 60:
@@ -24,11 +27,11 @@ def output_task(tg_id: int, cap="0"):
         elif notification == 120:
             notification = f'Напоминать за 2 часа.'
         if cap == "1":
-            task_text = (f'{idx}) {task["name"].capitalize()} - '
+            task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
                          f'{task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} '
                          f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}. {notification}')
         else:
-            task_text = (f'{idx}) {task["name"].capitalize()} - '
+            task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
                          f'{task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} '
                          f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
         tasks_list.append(task_text)
@@ -57,6 +60,28 @@ async def output(call: CallbackQuery):
             out = output_task_week(tg_id)
         elif settings_default[tg_id]["format_output"] == 3:
             out = output_task_today(tg_id)
-        await call.message.answer(out)
-        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await call.message.answer(out, reply_markup=completed_keyboard())
         await call.answer()
+
+@output_task_router.callback_query(F.data == "menu")
+async def menu(call: CallbackQuery):
+    await safe_delete(call.message)
+    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await call.answer()
+
+@output_task_router.callback_query(F.data == "mark_completed")
+async def mark_completed(call: CallbackQuery):
+    tg_id = call.from_user.id
+    await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id))
+
+@output_task_router.callback_query(F.data.startswith("completed_task_"))
+async def completed_task(call: CallbackQuery):
+    task_num = int(call.data.split("_")[2])
+    tg_id = call.from_user.id
+    task_completed = tasks[tg_id][task_num - 1]["completed"]
+    if not task_completed:
+        tasks[tg_id][task_num - 1]["completed"] = True
+        await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id))
+    else:
+        await call.answer("Эта задача уже отмечена как выполненная!")
+

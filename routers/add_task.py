@@ -147,7 +147,7 @@ async def notification_task(call: CallbackQuery, state: FSMContext):
     time = {"hour": time[0], "minute": time[1]}
     period = convert_selected_days_to_str(data["selected_days"])
     notification = data["notification"]
-    completed = True #поменять на false
+    completed = False
     # добавляем задачу в список
     tg_id = call.from_user.id
     tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification, "completed": completed})
