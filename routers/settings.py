@@ -112,14 +112,14 @@ async def time_zone(call: CallbackQuery):
     await call.message.answer("Выберите ваш часовой пояс:", reply_markup=time_zone_keyboard())
 
 #-ВЕРНУТЬСЯ НАЗАД-
-@settings_router.callback_query(F.data.startswith("cancel_setting_menu"))
+@settings_router.callback_query(F.data.startswith("cancel_setting_"))
 async def cancel_setting(call: CallbackQuery):
     comm = call.data.split("_")[2]
     await safe_delete(call.message)
     await call.answer("Возвращаемся назад...")
     if comm == "menu":
         await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-    else:
+    elif comm == "back":
         await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
     await call.answer()
 
