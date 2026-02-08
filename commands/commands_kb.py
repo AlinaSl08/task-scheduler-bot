@@ -10,3 +10,16 @@ def timezone_keyboard():
             kb.button(text=f"🌍 МСК{number}", callback_data=f"default_utc_{number}")
     kb.adjust(3, 3, 3, 2)
     return kb.as_markup()
+
+
+
+
+#клавиатура отчета по выполненным задачам
+def report_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🗒️ Отчет за эту неделю", callback_data="this_week")
+    kb.button(text="📊 Отчет за прошлую неделю", callback_data="last_week")
+    kb.button(text="🗓️ Отчет за все время", callback_data="general")
+    kb.button(text="⬅️ Отмена", callback_data="back")
+    kb.adjust(1, 1, 1, 1)
+    return kb.as_markup()

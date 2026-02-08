@@ -5,14 +5,16 @@ from aiogram.types import BotCommand
 from aiogram.types import Message, CallbackQuery
 from storage.tasks import tasks, settings_default
 from database.db import read_from_file, save_to_file
-from commands.commands_kb import timezone_keyboard
+from commands.commands_kb import timezone_keyboard, report_keyboard
 from utils.delete_last_message import delete_last_message, safe_delete
 from states.auth import Auth
 from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import tasks
 import datetime
-
 import os
+import pymorphy3
+
+morph = pymorphy3.MorphAnalyzer()
+
 
 # Базовый путь к папке data
 # На Amvera это будет /data, локально - data
@@ -114,29 +116,94 @@ async def settings(message: Message):
     await message.answer(settings_output(tg_id))
     await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
+#склоняет текст
+def get_word(word, count):
+    # Находит слово и согласует его с числом
+    return morph.parse(word)[0].make_agree_with_number(count).word
 
-def report_tasks(tg_id): #сделать за прошлую неделю выполненные и везде просроченные, в том числе сегодня по времени datetime.datetime
-    current_date = datetime.date.today()
+def get_done_word(count):
+    if count % 10 == 1 and count % 100 != 11:
+        return "выполнена"
+    return "выполнены"
+
+def get_expired_word(count):
+    if count % 10 == 1 and count % 100 != 11:
+        return "просрочена"
+    return "просрочены"
+
+@commands_router.callback_query(F.data.endswith("_week"))
+async def report_tasks_by_week(call: CallbackQuery): #сделать за прошлую неделю выполненные и везде просроченные, в том числе сегодня по времени datetime.datetime
+    result = call.data.split("_")[0]
+    await safe_delete(call.message)
+    tg_id = call.from_user.id
+    current_date = datetime.date.today() #сегодняшняя дата
     days_till_monday = datetime.date.weekday(current_date)
-    date_monday = current_date - datetime.timedelta(days=days_till_monday)
     count_completed = 0
+    count_expired = 0
     for task in tasks[tg_id]:
         day = task["date"]["day"]
         month = task["date"]["month"]
         year = task["date"]["year"]
         completed = task["completed"]
-        task_date = datetime.date(day=day, month=month, year=year)
-        if task_date >= date_monday and completed:
+        hour = task['time']["hour"]
+        minute = task['time']["minute"]
+        task_datetime = datetime.datetime(year, month, day, hour, minute)
+        now = datetime.datetime.now()
+        task_date = datetime.date(day=day, month=month, year=year) #дата задачи
+        if result == "this":
+            date_monday = current_date - datetime.timedelta(days=days_till_monday)  # дата прошлого понедельника
+            if task_date >= date_monday and completed:
+                count_completed += 1
+            elif task_date >= date_monday and task_datetime < now and not completed:
+                count_expired += 1
+        else:
+            date_last_monday = current_date - datetime.timedelta(days=days_till_monday) - datetime.timedelta(days=7) # дата позапрошлого понедельника
+            if task_date >= date_last_monday and completed:
+                count_completed += 1
+            elif task_date >= date_last_monday and task_datetime < now and not completed:
+                count_expired += 1
+    if result == "this":
+        await call.message.answer(f'📊 Статистика задач:\n\n✅ {get_done_word(count_completed).capitalize()} на этой неделе {count_completed} {get_word("задача", count_completed)}!'
+                                  f'\n⚠️ {get_expired_word(count_expired).capitalize()} на этой неделе {count_expired} {get_word("задача", count_expired)}!')
+    else:
+        await call.message.answer(f'📊 Статистика задач:\n\n✅ {get_done_word(count_completed).capitalize()} {count_completed} {get_word("задача", count_completed)} с прошлой недели!'
+                                  f'\n⚠️ {get_expired_word(count_expired).capitalize()} {count_expired} {get_word("задача", count_expired)} с прошлой недели!')
+    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    await call.answer()
+
+@commands_router.callback_query(F.data == "general")
+async def report_tasks(call: CallbackQuery):
+    await safe_delete(call.message)
+    count_completed = 0
+    count_expired = 0
+    tg_id = call.from_user.id
+    for task in tasks[tg_id]:
+        completed = task["completed"]
+        if completed:
             count_completed += 1
-    text = f'Выполнено на этой неделе {count_completed} задач!' #модуль который склоняет слова
-    return text
+        else:
+            count_expired += 1
+    await call.message.answer(
+        f'📊 Статистика задач:\n\n✅ Всего {get_done_word(count_completed)} {count_completed} {get_word("задача", count_completed)}!'
+        f'\n⚠️ Всего {get_expired_word(count_expired)} {count_expired} {get_word("задача", count_expired)}!')
+    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    await call.answer()
+
+@commands_router.callback_query(F.data == "back")
+async def report_cancel(call: CallbackQuery):
+    await safe_delete(call.message)
+    await call.answer("Возвращаемся назад...")
+    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    await call.answer()
 
 
-@commands_router.message(Command("report"))
+
+
+#отчет по выполненным и просроченным задачам
+@commands_router.message(Command("report")) #если пишет текстом, нужно уведа
 async def report(message: Message):
-    tg_id = message.from_user.id
-    await message.answer(report_tasks(tg_id))
-    await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    await message.answer("Какой отчет желаете получить?", reply_markup=report_keyboard())
+
 
 
 # создание подсказать к командам при вводе /
