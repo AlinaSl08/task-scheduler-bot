@@ -16,11 +16,11 @@ def edit_task_keyboard(tg_id: int): #вывод имеющихся задач
 
 def task_change_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="Название", callback_data="edit_name")
-    kb.button(text="Дата", callback_data="edit_date")
-    kb.button(text="Время", callback_data="edit_time")
-    kb.button(text="Период", callback_data="edit_period")
-    kb.button(text="Напоминание", callback_data="edit_notification")
-    kb.button(text="Назад", callback_data="undo_the_change")
+    kb.button(text="✏️ Название", callback_data="edit_name")
+    kb.button(text="📅 Дата", callback_data="edit_date")
+    kb.button(text="⏱️ Время", callback_data="edit_time")
+    kb.button(text="⏰ Период", callback_data="edit_period")
+    kb.button(text="🔔 Напоминание", callback_data="edit_notification")
+    kb.button(text="⬅️ Назад", callback_data="undo_the_change")
     kb.adjust(2, 2, 2)
     return kb.as_markup()

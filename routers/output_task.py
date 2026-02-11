@@ -1,14 +1,17 @@
 from aiogram.types import CallbackQuery
+
+from database.db import save_to_file
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import settings_default, tasks
 from aiogram import Router, F
 from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
+from commands.command import DATA_FILE_PATH
 
 output_task_router = Router()
 
 #вывод по порядку
-def output_task(tg_id: int, cap="0"):
+def output_task(tg_id: int, cap="0", str_task=0):
     tasks_list = ["📌 Список дел:"]
     for idx, task in enumerate(tasks[tg_id], 1):
         period = task["period"]
@@ -28,15 +31,18 @@ def output_task(tg_id: int, cap="0"):
             notification = f'Напоминать за 2 часа.'
         if cap == "1":
             task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
-                         f'{task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} '
+                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
                          f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}. {notification}')
         else:
             task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
-                         f'{task["date"]["day"]:02}.{task["date"]["month"]:02}.{task["date"]["year"]} '
+                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
                          f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
         tasks_list.append(task_text)
-    full_message = '\n\n'.join(tasks_list)
-    return full_message
+    if str_task == 0:
+        full_message = '\n\n'.join(tasks_list)
+        return full_message
+    else:
+        return tasks_list[str_task][3:]
 
 def output_task_week(tg_id: int): #тут будет вывод на неделю
     return "Функция не доделана!"
@@ -81,6 +87,7 @@ async def completed_task(call: CallbackQuery):
     task_completed = tasks[tg_id][task_num - 1]["completed"]
     if not task_completed:
         tasks[tg_id][task_num - 1]["completed"] = True
+        save_to_file(DATA_FILE_PATH, tasks)
         await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id))
     else:
         await call.answer("Эта задача уже отмечена как выполненная!")

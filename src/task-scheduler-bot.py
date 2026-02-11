@@ -22,7 +22,6 @@ from commands.command import commands_router, set_bot_commands
 #в amvera не обновляется data при добавлении
 
 
-#сделать кнопки выполнения задач
 #сделать вывод задач сегодня\на неделю
 
 

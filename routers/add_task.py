@@ -9,6 +9,7 @@ from keyboards.add_task_kb import get_date_keyboard, get_time_hour_keyboard, get
 from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import tasks
 from commands.command import DATA_FILE_PATH
+from states.edit_task import EditTask
 
 add_task_router = Router()
 
@@ -203,8 +204,8 @@ async def next_month(call: CallbackQuery, state: FSMContext):
             edit_month = current_month + 1
         await state.update_data(current_month=edit_month, current_year=current_year)
         await call.message.edit_reply_markup(reply_markup=get_date_keyboard(current_month=edit_month, current_year=current_year, cap="<"))
-    except:
-        print("Ошибка. Следующий месяц не существует")
+    except Exception as e:
+        print("Ошибка. Следующий месяц не существует. Название ошибки:", e)
         await call.answer("Ошибка")
 
 #если нажмет активную стрелку назад
@@ -235,7 +236,8 @@ async def last_month(call: CallbackQuery, state: FSMContext):
 #если нажимает на дату
 @add_task_router.callback_query(F.data.startswith("date_"))
 async def choose_date(call: CallbackQuery, state: FSMContext):
-    date_day = int(call.data.split("_")[1])
+    date_day = int(call.data.split("_")[2])
+    mode = call.data.split("_")[1]
     data = await state.get_data()
     date_month = data.get("current_month")
     date_year = data.get("current_year")
@@ -243,15 +245,47 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
     real_date_month = data.get("real_current_month")
     real_date_year = data.get("real_current_year")
     real_date_day = data.get("real_current_day")
-    print(data)
-    print(real_date_day)
-    print(date_day)
     #если дата уже прошла
     if real_date_day > date_day and date_month == real_date_month and real_date_year == date_year:
         await call.answer("Дата уже прошла, попробуйте снова")
         return
     real_date_str = f"{real_date_day}.{real_date_month}.{real_date_year}"
     date_str = f"{date_day}.{date_month}.{date_year}"
+    print(date_str)
+    if mode == "edit":
+        number_task = data.get("number_task")
+        now = datetime.now()
+        today_time = now.strftime("%H:%M:%S").split(":")
+        tg_id = call.from_user.id
+        hour = tasks[tg_id][number_task - 1]["time"]["hour"]
+        minute = tasks[tg_id][number_task - 1]["time"]["minute"]
+        if len(str(hour)) == 1:
+            hour = "0" + hour
+        if real_date_str == date_str:
+            if int(today_time[0]) <= hour: # если час такой же как сейчас или больше
+                if minute <= today_time[1]:
+                    await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
+                    return
+                else:
+                    tasks[tg_id][number_task - 1]['date']['day'] = date_str.split(".")[0]
+                    tasks[tg_id][number_task - 1]['date']['month'] = date_str.split(".")[1]
+                    tasks[tg_id][number_task - 1]['date']['year'] = date_str.split(".")[2]
+                    save_to_file(DATA_FILE_PATH, tasks)
+                    await safe_delete(call.message)
+                    await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
+                    return
+            elif int(today_time[0]) > hour:
+                await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
+                return
+        else:
+            tasks[tg_id][number_task - 1]['date']['day'] = date_str.split(".")[0]
+            tasks[tg_id][number_task - 1]['date']['month'] = date_str.split(".")[1]
+            tasks[tg_id][number_task - 1]['date']['year'] = date_str.split(".")[2]
+            save_to_file(DATA_FILE_PATH, tasks)
+            await safe_delete(call.message)
+            await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
+            await state.set_state(EditTask.date)
+            return
     await state.update_data(date=date_str, real_date_str=real_date_str)
     await safe_delete(call.message)
     await state.set_state(AddTask.time)

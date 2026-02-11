@@ -3,8 +3,11 @@ import calendar
 
 days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
+
 # клавиатура даты
-def get_date_keyboard(current_month=1, current_year=2026, cap=" "):
+def get_date_keyboard(current_month=1, current_year=2026, cap=" ", mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     #делаем клавиатуру
     kb = InlineKeyboardBuilder()
     calendar_for_keyboard = calendar.Calendar().monthdayscalendar(current_year, current_month)
@@ -18,19 +21,23 @@ def get_date_keyboard(current_month=1, current_year=2026, cap=" "):
         kb.button(text=f"{cap}", callback_data="cap")
     else:
         kb.button(text=f"{cap}", callback_data="last_month")
-    kb.button(text=f"{months[current_month - 1]} {current_year}", callback_data="cap") #если сюда нажмет то уведу
+    kb.button(text=f"{months[current_month - 1]} {current_year}", callback_data="cap") #если нажал на нерабочую кнопку
     kb.button(text=">", callback_data="next_month")
     #дни недели
     days_week = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
     for day_week in days_week:
-        kb.button(text=day_week, callback_data=f"cap") #если сюда нажмет то уведу
+        kb.button(text=day_week, callback_data=f"cap") #если нажал на нерабочую кнопку
     #календарь
     for day in new_calendar:
         if day == 0:
             kb.button(text=f" ", callback_data=f"cap")
         else:
-            kb.button(text=f"{day}", callback_data=f"date_{day}")
-    kb.adjust(3, 7, 7, 7, 7, 7, 7)
+            kb.button(text=f"{day}", callback_data=f"date_{mode}_{day}")
+    if mode_key == 2:
+        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change")
+        kb.adjust(3, 7, 7, 7, 7, 7, 7, 1)
+    else:
+        kb.adjust(3, 7, 7, 7, 7, 7, 7)
     return kb.as_markup()
 
 
