@@ -18,7 +18,7 @@ morph = pymorphy3.MorphAnalyzer()
 
 # Базовый путь к папке data
 # На Amvera это будет /data, локально - data
-DATA_DIR = "/data" if "AMVERA" in os.environ else "data"
+DATA_DIR = "/data"
 
 # Путь к конкретному файлу
 DATA_FILE_PATH = os.path.join(DATA_DIR, "data.json")
@@ -28,6 +28,8 @@ SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")
 commands_router = Router()
 #DATA_FILE_PATH = 'data/data.json'
 #SETTINGS_FILE_PATH = 'data/settings.json'
+os.makedirs(DATA_DIR, exist_ok=True)
+
 
 read_from_file(DATA_FILE_PATH, tasks)
 read_from_file(SETTINGS_FILE_PATH, settings_default)
