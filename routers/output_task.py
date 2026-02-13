@@ -1,5 +1,5 @@
 from aiogram.types import CallbackQuery
-
+from aiogram.fsm.context import FSMContext
 from database.db import save_to_file
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
@@ -51,13 +51,14 @@ def output_task_today(tg_id: int): #тут будет вывод на сегод
     return "Функция не доделана!"
 
 @output_task_router.callback_query(F.data == "output")
-async def output(call: CallbackQuery):
+async def output(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = call.from_user.id
     out = "Не смог вывести список"
     if len(tasks[tg_id]) == 0:
         await call.message.answer("🙁 Список пуст!")
-        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
     else:
         if settings_default[tg_id]["format_output"] == 1:
@@ -70,9 +71,10 @@ async def output(call: CallbackQuery):
         await call.answer()
 
 @output_task_router.callback_query(F.data == "menu")
-async def menu(call: CallbackQuery):
+async def menu(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
 
 @output_task_router.callback_query(F.data == "mark_completed")

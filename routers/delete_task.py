@@ -6,6 +6,7 @@ from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import tasks
 from keyboards.delete_task_kb import delete_task_keyboard, delete_issue
 from routers.output_task import output_task
+from states.menu import Menu
 
 delete_task_router = Router()
 
@@ -16,7 +17,8 @@ async def delete_task(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
     if len(tasks[tg_id]) == 0:
         await call.message.answer("😊 Нет задач, которые можно удалить")
-        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
     else:
         tasks_list = output_task(tg_id)
@@ -41,7 +43,8 @@ async def delete_no(call: CallbackQuery, state: FSMContext):
     await call.bot.delete_message(chat_id=call.message.chat.id,
                 message_id=tasks_message)
     await call.message.answer("❎ Удаление отменено")
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
 
 @delete_task_router.callback_query(F.data == "delete_yes")
@@ -57,5 +60,7 @@ async def delete_yes(call: CallbackQuery, state: FSMContext):
     await call.message.answer("✅ Задача успешно удалена!")
     print(tasks)
     await state.clear()
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.set_state(Menu.menu)
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()

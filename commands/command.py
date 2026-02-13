@@ -8,6 +8,7 @@ from database.db import read_from_file, save_to_file
 from commands.commands_kb import timezone_keyboard, report_keyboard
 from utils.delete_last_message import delete_last_message, safe_delete
 from states.auth import Auth
+from states.menu import Menu
 from keyboards.main_kb import main_menu_keyboard
 import datetime
 import os
@@ -15,10 +16,10 @@ import pymorphy3
 
 morph = pymorphy3.MorphAnalyzer()
 
-
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # Базовый путь к папке data
 # На Amvera это будет /data, локально - data
-DATA_DIR = "/data"
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # Путь к конкретному файлу
 DATA_FILE_PATH = os.path.join(DATA_DIR, "data.json")
@@ -62,8 +63,15 @@ async def start(message: Message, state: FSMContext): #обозначаем чт
                                        "\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
         await state.update_data(start_msg=bot_msg.message_id)
         await state.set_state(Auth.timezone)
+        #await state.set_state(Menu.menu)
     else:
-        await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        bot_msg = await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.set_state(Menu.menu)
+        await state.update_data(last_msg_id=bot_msg.message_id)
+
+
+
+
 
 @commands_router.message(Auth.timezone)
 async def ignore_timezone(message: Message, state: FSMContext):
@@ -89,17 +97,19 @@ async def utc_selection_default(call: CallbackQuery, state: FSMContext):
     print(settings_default)
     save_to_file(SETTINGS_FILE_PATH, settings_default)
     await call.answer("Настройки применены!")
-    await state.clear()
+    await state.set_state(Menu.menu)
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
 
 @commands_router.message(Command("help"))
 async def help(message: Message):
-    await message.answer("Список доступных команд бота: \n/start\n/menu\n/help\n/settings")
+    await message.answer("Список доступных команд бота: \n/start\n/menu\n/help\n/settings\n/report")
 
 @commands_router.message(Command("menu"))
-async def menu(message: Message):
-    await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+async def menu(message: Message, state: FSMContext):
+    bot_msg = await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.set_state(Menu.menu)
+    await state.update_data(last_msg_id=bot_msg.message_id)
 
 def settings_output(tg_id):
     tz = settings_default[tg_id]['timezone']
@@ -220,3 +230,20 @@ async def set_bot_commands(bot):
     await bot.set_my_commands(commands) # отправляем телеграм список команд бота
 
 
+
+
+@commands_router.message(F.text)
+async def ignore_menu(message: Message, state: FSMContext):
+    current_state = await state.get_state()
+    # Если пользователь находится в состоянии меню
+    if current_state == Menu.menu.state:
+        data = await state.get_data()
+        menu_msg_id = data.get("last_msg_id")
+        # Удаляем старое сообщение бота
+        if menu_msg_id:
+            await delete_last_message(menu_msg_id, message)
+        bot_msg = await message.answer(
+            "Пожалуйста, выберите действие с помощью кнопок ниже 👇", reply_markup=main_menu_keyboard()
+        )
+        # Сохраняем новый id
+        await state.update_data(last_msg_id=bot_msg.message_id)

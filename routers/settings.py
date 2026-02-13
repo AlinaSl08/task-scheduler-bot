@@ -1,5 +1,6 @@
 from aiogram.types import CallbackQuery
 from aiogram import Router, F
+from aiogram.fsm.context import FSMContext
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from keyboards.settings_kb import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
@@ -16,7 +17,7 @@ async def settings_task(call: CallbackQuery):
 
 #вывод задач
 @settings_router.callback_query(F.data.startswith ("task_")) #доделать
-async def task_all(call: CallbackQuery):
+async def task_all(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     tg_id = call.from_user.id
@@ -37,12 +38,13 @@ async def task_all(call: CallbackQuery):
     settings_default[tg_id]['format_output'] = number
     save_to_file('../settings.json', settings_default)
     print(settings_default)
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
 
 #сортировка
 @settings_router.callback_query(F.data.startswith ("sort_"))
-async def sort_name(call: CallbackQuery):
+async def sort_name(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     #сделать постоянную сортировку
@@ -65,13 +67,14 @@ async def sort_name(call: CallbackQuery):
     settings_default[tg_id]['sort'] = number
     save_to_file('../settings.json', settings_default)
     print(settings_default)
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
 
 
 #выбор часового пояса
 @settings_router.callback_query(F.data.startswith ("utc_")) #тут доделать
-async def utc_selection(call: CallbackQuery):
+async def utc_selection(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     tg_id = call.from_user.id
@@ -89,7 +92,8 @@ async def utc_selection(call: CallbackQuery):
     )
     print(settings_default)
     await call.answer()
-    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
+    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+    await state.update_data(last_msg_id=bot_msg.message_id)
 
 #-ФОРМАТ ВЫВОДА-
 @settings_router.callback_query(F.data == "format_output")
@@ -113,12 +117,13 @@ async def time_zone(call: CallbackQuery):
 
 #-ВЕРНУТЬСЯ НАЗАД-
 @settings_router.callback_query(F.data.startswith("cancel_setting_"))
-async def cancel_setting(call: CallbackQuery):
+async def cancel_setting(call: CallbackQuery, state: FSMContext):
     comm = call.data.split("_")[2]
     await safe_delete(call.message)
     await call.answer("Возвращаемся назад...")
     if comm == "menu":
-        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
     elif comm == "back":
         await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
     await call.answer()
