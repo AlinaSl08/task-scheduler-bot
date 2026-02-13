@@ -60,9 +60,6 @@ async def edit_number_task(call: CallbackQuery, state: FSMContext):
 async def edit_name(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     data = await state.get_data()
-    tasks_message = data.get("tasks_message_id")
-    #await call.bot.delete_message(chat_id=call.message.chat.id,
-    #                              message_id=tasks_message)
     bot_msg = await call.message.answer("Напишите название задачи:")
     await state.update_data(bot_msg=bot_msg.message_id)
     await state.set_state(EditTask.name)
@@ -71,7 +68,7 @@ async def edit_name(call: CallbackQuery, state: FSMContext):
 async def edit_date(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     data = await state.get_data()
-    tasks_message = data.get("tasks_message_id")
+    #tasks_message = data.get("tasks_message_id")
     current_datetime = datetime.now()
     current_month = current_datetime.month
     current_year = current_datetime.year
@@ -106,9 +103,3 @@ async def get_new_name(message: Message,  state: FSMContext):
     await state.clear()
     await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
 
-#изменить дату
-@edit_task_router.callback_query(StateFilter(EditTask.date)) #вот это не работает
-async def edit_date(call: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-    await call.answer()

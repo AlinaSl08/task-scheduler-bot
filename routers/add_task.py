@@ -273,6 +273,7 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
                     save_to_file(DATA_FILE_PATH, tasks)
                     await safe_delete(call.message)
                     await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
+                    await state.set_state(EditTask.date)
                     return
             elif int(today_time[0]) > hour:
                 await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
@@ -284,13 +285,16 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
             save_to_file(DATA_FILE_PATH, tasks)
             await safe_delete(call.message)
             await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
-            await state.set_state(EditTask.date)
+            await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+            await state.clear()
+            await call.answer()
             return
-    await state.update_data(date=date_str, real_date_str=real_date_str)
-    await safe_delete(call.message)
-    await state.set_state(AddTask.time)
-    await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_hour_keyboard())
-    await call.answer()
+    else:
+        await state.update_data(date=date_str, real_date_str=real_date_str)
+        await safe_delete(call.message)
+        await state.set_state(AddTask.time)
+        await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_hour_keyboard())
+        await call.answer()
 
 # добавляем имя
 @add_task_router.message(AddTask.name)
