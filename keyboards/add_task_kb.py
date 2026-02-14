@@ -48,25 +48,36 @@ current_datetime = datetime.now() ---> current_day = current_datetime.day (и т
 '''
 
 # клавиатура часов
-def get_time_hour_keyboard(page=1):
+def get_time_hour_keyboard(page=1, mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
     if page == 1:
         for i in range(0, 12):
-            kb.button(text=str(i), callback_data=f"hour_{i}")
-        kb.button(text=">", callback_data=f"next_hour")
+            kb.button(text=str(i), callback_data=f"hour_{mode}_{i}")
+        kb.button(text=">", callback_data=f"next_hour_{mode}")
+        if mode == "edit":
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
+
     elif page == 2:
         for i in range(12, 24):
-            kb.button(text=str(i), callback_data=f"hour_{i}")
-        kb.button(text="<", callback_data=f"prev_hour")
-    kb.adjust(3, 3, 3, 3, 2)
+            kb.button(text=str(i), callback_data=f"hour_{mode}_{i}")
+        kb.button(text="<", callback_data=f"prev_hour_{mode}")
+        if mode == "edit":
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
+    kb.adjust(3, 3, 3, 3, 1, 1)
     return kb.as_markup()
 
 # клавиатура минут
-def get_time_minute_keyboard(hour="00"): #тут подставить выбранный час в текст, пример : 15:(текст кнопки)
+def get_time_minute_keyboard(hour="00", mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
     for i in range(0, 6):
-        kb.button(text=f'{hour}:{i}0', callback_data=f"time_{hour}:{i}0")
-        kb.button(text=f'{hour}:{i}5', callback_data=f"time_{hour}:{i}5")
+        kb.button(text=f'{hour}:{i}0', callback_data=f"time_{mode}_{hour}:{i}0")
+        kb.button(text=f'{hour}:{i}5', callback_data=f"time_{mode}_{hour}:{i}5")
+    if mode == "edit":
+        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
     kb.adjust(4, 4)
     return kb.as_markup()
 

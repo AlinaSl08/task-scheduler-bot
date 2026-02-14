@@ -9,7 +9,7 @@ from routers.output_task import output_task
 from states.edit_task import EditTask
 from database.db import save_to_file
 from commands.command import DATA_FILE_PATH
-from keyboards.add_task_kb import get_date_keyboard, get_period_keyboard, get_notification_keyboard
+from keyboards.add_task_kb import get_date_keyboard, get_period_keyboard, get_notification_keyboard, get_time_hour_keyboard
 from routers.add_task import convert_selected_days_to_str
 from _datetime import datetime
 from states.menu import Menu
@@ -48,6 +48,8 @@ async def undo_the_change(call: CallbackQuery, state: FSMContext):
         tasks_last_message_id = data.get("tasks_list_id")
         await delete_last_message(tasks_last_message_id, call.message)
     await call.answer("Изменение отменено!")
+    await state.clear()
+    await state.set_state(Menu.menu)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
@@ -119,7 +121,19 @@ async def get_new_name(message: Message,  state: FSMContext):
 
 
 #изменить время
-
+@edit_task_router.callback_query(F.data == "edit_time")
+async def edit_time(call: CallbackQuery, state: FSMContext):
+    await safe_delete(call.message)
+    current_datetime = datetime.now()
+    real_current_day = current_datetime.day
+    real_current_month = current_datetime.month
+    real_current_year = current_datetime.year
+    real_date_str = f"{real_current_day}.{real_current_month}.{real_current_year}"
+    await state.update_data(real_date_str=real_date_str)
+    bot_msg = await call.message.answer("Выберите время для вашей задачи:",
+                                        reply_markup=get_time_hour_keyboard(mode_key=2))
+    await state.update_data(bot_msg_id=bot_msg.message_id)
+    await state.set_state(EditTask.time)
 
 
 #изменить период
@@ -182,8 +196,6 @@ async def edit_notification(call: CallbackQuery, state: FSMContext):
 
 
 
-
-
 #Если пользователь пишет текстом, а не выбирает кнопки в клавиатуре
 @edit_task_router.message(EditTask.date)
 async def ignore_input_date(message: Message, state: FSMContext):
@@ -216,4 +228,13 @@ async def ignore_input_notification(message: Message, state: FSMContext):
     if old_bot_msg_id:
         await delete_last_message(old_bot_msg_id, message)
     new_bot_msg = await message.answer("Пожалуйста, выберите напоминание с помощью кнопок ниже 👇", reply_markup=get_period_keyboard(mode_key=2))
+    await state.update_data(bot_msg_id=new_bot_msg.message_id)
+
+@edit_task_router.message(EditTask.time)
+async def ignore_input_time(message: Message, state: FSMContext):
+    data = await state.get_data()
+    old_bot_msg_id = data.get("bot_msg_id")
+    if old_bot_msg_id:
+        await delete_last_message(old_bot_msg_id, message)
+    new_bot_msg = await message.answer("Пожалуйста, выберите время с помощью кнопок ниже 👇", reply_markup=get_time_hour_keyboard(mode_key=2))
     await state.update_data(bot_msg_id=new_bot_msg.message_id)

@@ -6,6 +6,7 @@ from keyboards.main_kb import main_menu_keyboard
 from keyboards.settings_kb import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
 from storage.tasks import settings_default
 from database.db import save_to_file
+from commands.command import SETTINGS_FILE_PATH
 
 settings_router = Router()
 
@@ -36,7 +37,7 @@ async def task_all(call: CallbackQuery, state: FSMContext):
         f"📄 Формат вывода — {formats[number]}"
     )
     settings_default[tg_id]['format_output'] = number
-    save_to_file('../settings.json', settings_default)
+    save_to_file(SETTINGS_FILE_PATH, settings_default)
     print(settings_default)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
@@ -65,7 +66,7 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
         f"📌 Сортировка — {sorts[number]}"
     )
     settings_default[tg_id]['sort'] = number
-    save_to_file('../settings.json', settings_default)
+    save_to_file(SETTINGS_FILE_PATH, settings_default)
     print(settings_default)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
@@ -83,7 +84,7 @@ async def utc_selection(call: CallbackQuery, state: FSMContext):
         await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
         return
     settings_default[tg_id]['timezone'] = number
-    save_to_file('../settings.json', settings_default)
+    save_to_file(SETTINGS_FILE_PATH, settings_default)
     tz_text = f"МСК{number:+}" if number != 0 else "МСК"
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"

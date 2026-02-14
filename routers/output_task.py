@@ -7,6 +7,8 @@ from storage.tasks import settings_default, tasks
 from aiogram import Router, F
 from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
 from commands.command import DATA_FILE_PATH
+from datetime import datetime
+
 
 output_task_router = Router()
 
@@ -48,7 +50,39 @@ def output_task_week(tg_id: int): #тут будет вывод на недел�
     return "Функция не доделана!"
 
 def output_task_today(tg_id: int): #тут будет вывод на сегодня
-    return "Функция не доделана!"
+    current_datetime = datetime.now()
+    current_day = current_datetime.day
+    current_month = current_datetime.month
+    current_year = current_datetime.year
+    tasks_list = []
+    for task in tasks[tg_id]:
+        task_day = task["date"]["day"]
+        task_month = task["date"]["month"]
+        task_year =task["date"]["year"]
+        if task_day == current_day and current_month == task_month and current_year == task_year:
+            period = task["period"]
+            completed = ""
+            if task["completed"]:
+                completed = " ✅"
+            if isinstance(period, list):
+                period_str = ", ".join(period) if period else "Без повторений"
+            else:
+                period_str = period
+            task_text = (f'{completed} {task["name"].capitalize()} - '
+                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
+                         f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
+            tasks_list.append(task_text)
+    task_list_out = ["📌 Список дел:"]
+    if len(tasks_list) > 0:
+        for idx, task in enumerate(tasks_list, 1):
+            task_text = (f'{idx}) {task}')
+            task_list_out.append(task_text)
+        full_message = '\n\n'.join(task_list_out)
+        return full_message
+    else:
+        return False
+
+
 
 @output_task_router.callback_query(F.data == "output")
 async def output(call: CallbackQuery, state: FSMContext):
@@ -67,6 +101,13 @@ async def output(call: CallbackQuery, state: FSMContext):
             out = output_task_week(tg_id)
         elif settings_default[tg_id]["format_output"] == 3:
             out = output_task_today(tg_id)
+            if not out:
+                await call.message.answer("🙁 Список пуст!")
+                bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+                await state.update_data(last_msg_id=bot_msg.message_id)
+                await call.answer()
+                return
+        await state.update_data(out=out)
         await call.message.answer(out, reply_markup=completed_keyboard())
         await call.answer()
 
@@ -78,19 +119,23 @@ async def menu(call: CallbackQuery, state: FSMContext):
     await call.answer()
 
 @output_task_router.callback_query(F.data == "mark_completed")
-async def mark_completed(call: CallbackQuery):
+async def mark_completed(call: CallbackQuery, state: FSMContext):
     tg_id = call.from_user.id
-    await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id))
+    data = await state.get_data()
+    out_list = data.get("out")
+    await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
 
 @output_task_router.callback_query(F.data.startswith("completed_task_"))
-async def completed_task(call: CallbackQuery):
+async def completed_task(call: CallbackQuery, state: FSMContext):
     task_num = int(call.data.split("_")[2])
     tg_id = call.from_user.id
     task_completed = tasks[tg_id][task_num - 1]["completed"]
     if not task_completed:
         tasks[tg_id][task_num - 1]["completed"] = True
         save_to_file(DATA_FILE_PATH, tasks)
-        await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id))
+        data = await state.get_data()
+        out_list = data.get("out")
+        await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
     else:
         await call.answer("Эта задача уже отмечена как выполненная!")
 

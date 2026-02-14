@@ -103,7 +103,7 @@ async def utc_selection_default(call: CallbackQuery, state: FSMContext):
 
 @commands_router.message(Command("help"))
 async def help(message: Message):
-    await message.answer("Список доступных команд бота: \n/start\n/menu\n/help\n/settings\n/report")
+    await message.answer("🤖 Список доступных команд бота: \n/start\n/menu\n/help\n/settings\n/report")
 
 @commands_router.message(Command("menu"))
 async def menu(message: Message, state: FSMContext):

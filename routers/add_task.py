@@ -26,40 +26,66 @@ async def add_task(call: CallbackQuery, state: FSMContext):
     await state.set_state(AddTask.name) #задает начало цепочки(откуда стартовать)
 
 # часы 1 часть
-@add_task_router.callback_query(F.data == "next_hour")
+@add_task_router.callback_query(F.data.startswith("next_hour"))
 async def next_hour(call: CallbackQuery):
-    await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2))
+    mode_time = call.data.split("_")[2]
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2, mode_key=1))
+    else:
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2, mode_key=2))
 
 # часы 2 часть
-@add_task_router.callback_query(F.data == "prev_hour")
+@add_task_router.callback_query(F.data.startswith("prev_hour"))
 async def prev_hour(call: CallbackQuery):
-    await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1))
+    mode_time = call.data.split("_")[2]
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1, mode_key=1))
+    else:
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1, mode_key=2))
 
-# минуты
+# часы
 @add_task_router.callback_query(F.data.startswith("hour_"))
 async def hour_task(call: CallbackQuery, state: FSMContext):
-    hour = call.data.split("_")[1]
+    hour = call.data.split("_")[2]
+    mode_time = call.data.split("_")[1]
     data = await state.get_data()
-    today_date = data.get("real_date_str")
-    selected_date = data.get("date")
+
+    if mode_time == "add":
+        today_date = data.get("real_date_str")
+        selected_date = data.get("date")
+    else:
+        today_date = data.get("real_date_str")
+        number_task = data.get("number_task")
+        tg_id = call.from_user.id
+        date_day = tasks[tg_id][number_task - 1]["date"]["day"]
+        date_month = tasks[tg_id][number_task - 1]["date"]["month"]
+        date_year = tasks[tg_id][number_task - 1]["date"]["year"]
+        date_str = f"{date_day}.{date_month}.{date_year}"
+        selected_date = date_str
+
     now = datetime.now()
-    today_time = now.strftime("%H:%M:%S").split(":")
+    today_time = now.strftime("%H:%M:%S").split(":") #время сейчас
     if len(hour) == 1:
         hour = "0" + hour
     same_hour = 0
-    if today_date == selected_date:
+    if today_date == selected_date: #если дата выбрана такая же, как сейчас, делаем проверку
         if today_time[0] == hour:
             same_hour = 1 #если час такой же как сейчас
         elif today_time[0] > hour:
             await call.answer("Час уже прошел, попробуйте снова")
             return
     await state.update_data(same_hour=same_hour)
-    await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour))
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour, mode_key=1))
+    else:
+        bot_msg = await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour, mode_key=2))
+        await state.update_data(bot_msg_id=bot_msg.message_id)
 
-# переход от времени к периоду
+# переход от времени к периоду, проверка минут
 @add_task_router.callback_query(F.data.startswith("time_"))
 async def time_task(call: CallbackQuery, state: FSMContext):
-    time = call.data.split("_")[1]
+    time = call.data.split("_")[2]
+    mode_time = call.data.split("_")[1]
     minute = time.split(":")[1]
     hour = time.split(":")[0]
     data = await state.get_data()
@@ -69,15 +95,32 @@ async def time_task(call: CallbackQuery, state: FSMContext):
     today_time = now.strftime("%H:%M:%S").split(":")
     if same_hour == 1 and int(today_time[1]) >= int(minute):
         await call.answer("Время уже прошло, попробуйте снова")
-        await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour))
+        if mode_time == "add":
+            await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour, mode_key=1))
+        else:
+            await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour, mode_key=2))
         await call.answer()
         return
-    selected = [0, 0, 0, 0, 0, 0, 0]
-    bot_msg = await call.message.answer("По каким дням недели будет повторяться задача?:",
-                                   reply_markup=get_period_keyboard())
-    await state.update_data(time=time, last_msg_id=bot_msg.message_id, selected_days=selected)
-    await state.set_state(AddTask.period)
-    await call.answer()
+    if mode_time == "add":
+        selected = [0, 0, 0, 0, 0, 0, 0]
+        bot_msg = await call.message.answer("По каким дням недели будет повторяться задача?:",
+                                       reply_markup=get_period_keyboard())
+        await state.update_data(time=time, last_msg_id=bot_msg.message_id, selected_days=selected)
+        await state.set_state(AddTask.period)
+        await call.answer()
+    else:
+        tg_id = call.from_user.id
+        number_task = data.get("number_task")
+        tasks[tg_id][number_task - 1]["time"]["hour"] = hour
+        tasks[tg_id][number_task - 1]["time"]["minute"] = minute
+        tasks_message_id_out = data.get("tasks_list_id")
+        await delete_last_message(tasks_message_id_out, call.message)
+        await call.message.answer("✅ Время задачи изменено!")
+        save_to_file(DATA_FILE_PATH, tasks)
+        await state.clear()
+        await state.set_state(Menu.menu)
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
 
 # без периода повторения
 @add_task_router.callback_query(F.data == "no_period")
@@ -290,7 +333,7 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
         if len(str(hour)) == 1:
             hour = "0" + hour
         if real_date_str == date_str:
-            if int(today_time[0]) <= hour: # если час такой же как сейчас или больше
+            if int(today_time[0]) <= int(hour): # если час такой же как сейчас или больше
                 if minute <= today_time[1]:
                     await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
                     return
@@ -304,8 +347,13 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
                     await safe_delete(call.message)
                     await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
                     await state.set_state(EditTask.date)
+                    await state.clear()
+                    await state.set_state(Menu.menu)
+                    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+                    await state.update_data(last_msg_id=bot_msg.message_id)
+                    await call.answer()
                     return
-            elif int(today_time[0]) > hour:
+            elif int(today_time[0]) > int(hour):
                 await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
                 return
         else:
