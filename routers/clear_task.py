@@ -11,7 +11,7 @@ clear_task_router = Router()
 @clear_task_router.callback_query(F.data == "clear")
 async def clear_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if len(tasks[tg_id]) == 0:
         await call.message.answer("🙁 Список уже пуст!")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
@@ -25,7 +25,7 @@ async def clear_task(call: CallbackQuery, state: FSMContext):
 @clear_task_router.callback_query(F.data == "clear_yes")
 async def confirm_clear(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     tasks[tg_id].clear()
     await call.message.answer("🗑️ Все задачи удалены")
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())

@@ -1,7 +1,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from storage.tasks import tasks
 
-def delete_task_keyboard(tg_id: int):
+def delete_task_keyboard(tg_id: str):
     kb = InlineKeyboardBuilder()
     for i in range(1, len(tasks[tg_id]) + 1):
         kb.button(text=f"{i}", callback_data=f"del_task_{i}")

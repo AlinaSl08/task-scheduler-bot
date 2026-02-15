@@ -20,7 +20,7 @@ edit_task_router = Router()
 @edit_task_router.callback_query(F.data == "change")
 async def edit_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if len(tasks[tg_id]) == 0:
         await call.message.answer("😊 Нет задач, которые можно изменить")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
@@ -63,7 +63,7 @@ async def edit_number_task(call: CallbackQuery, state: FSMContext):
     tasks_last_message_id = data.get("tasks_message_id")
     await state.update_data(number_task=number_task)
     await delete_last_message(tasks_last_message_id, call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     tasks_list = output_task(tg_id, cap="1", str_task=number_task)
     tasks_list_id_out = await call.message.answer(f"Вы выбрали задачу номер {number_task}:\n\n{tasks_list}")
     await state.update_data(tasks_list_id=tasks_list_id_out.message_id)
@@ -74,7 +74,6 @@ async def edit_number_task(call: CallbackQuery, state: FSMContext):
 @edit_task_router.callback_query(F.data == "edit_date")
 async def edit_date(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    data = await state.get_data()
     current_datetime = datetime.now()
     current_month = current_datetime.month
     current_year = current_datetime.year
@@ -102,7 +101,7 @@ async def edit_name(call: CallbackQuery, state: FSMContext):
 @edit_task_router.message(EditTask.name)
 async def get_new_name(message: Message,  state: FSMContext):
     new_name = message.text
-    tg_id = message.from_user.id
+    tg_id = str(message.from_user.id)
     data = await state.get_data()
     number_task = data.get("number_task") #номер задачи
     bot_last_msg = data.get("bot_msg")
@@ -152,7 +151,7 @@ async def continue_get_period_edit(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     period = convert_selected_days_to_str(data["selected_days"])
     print(period)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     number_task = data.get("number_task")
     tasks[tg_id][number_task - 1]["period"] = period
     save_to_file(DATA_FILE_PATH, tasks)
@@ -171,7 +170,7 @@ async def no_period_edit(call: CallbackQuery, state: FSMContext):
     await call.message.answer("✅ Задача изменена! Повторяться не будет!")
     data = await state.get_data()
     period = 'Без повторений'
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     number_task = data.get("number_task")
     tasks[tg_id][number_task - 1]["period"] = period
     save_to_file(DATA_FILE_PATH, tasks)

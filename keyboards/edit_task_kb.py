@@ -1,7 +1,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from storage.tasks import tasks
 
-def edit_task_keyboard(tg_id: int): #вывод имеющихся задач
+def edit_task_keyboard(tg_id: str): #вывод имеющихся задач
     kb = InlineKeyboardBuilder()
     for i in range(1, len(tasks[tg_id]) + 1):
         kb.button(text=f"{i}", callback_data=f"edit_task_{i}")

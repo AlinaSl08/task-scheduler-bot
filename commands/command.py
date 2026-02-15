@@ -53,10 +53,10 @@ settings_transcript = {
 
 @commands_router.message(Command("start"))
 async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)
-    if message.chat.id not in tasks:
-        tasks[message.chat.id] = [] #тут сохраняется строка
-        tg_id = message.from_user.id #тут сохраняется число
-        settings_default[tg_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
+    user_id = str(message.chat.id)
+    if user_id not in tasks:
+        tasks[user_id] = [] #тут сохраняется строка
+        settings_default[user_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
         save_to_file(DATA_FILE_PATH, tasks)
         save_to_file(SETTINGS_FILE_PATH, settings_default)
         bot_msg = await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания."
@@ -92,7 +92,7 @@ async def ignore_timezone(message: Message, state: FSMContext):
 async def utc_selection_default(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[2])
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     settings_default[tg_id]['timezone'] = number
     print(settings_default)
     save_to_file(SETTINGS_FILE_PATH, settings_default)
@@ -124,7 +124,7 @@ def settings_output(tg_id):
 #вывод настроек пользователя
 @commands_router.message(Command("settings"))
 async def settings(message: Message):
-    tg_id = message.from_user.id
+    tg_id = str(message.from_user.id)
     await message.answer(settings_output(tg_id))
     await message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
 
@@ -144,10 +144,10 @@ def get_expired_word(count):
     return "просрочены"
 
 @commands_router.callback_query(F.data.endswith("_week"))
-async def report_tasks_by_week(call: CallbackQuery): #сделать за прошлую неделю выполненные и везде просроченные, в том числе сегодня по времени datetime.datetime
+async def report_tasks_by_week(call: CallbackQuery):
     result = call.data.split("_")[0]
     await safe_delete(call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     current_date = datetime.date.today() #сегодняшняя дата
     days_till_monday = datetime.date.weekday(current_date)
     count_completed = 0
@@ -188,7 +188,7 @@ async def report_tasks(call: CallbackQuery):
     await safe_delete(call.message)
     count_completed = 0
     count_expired = 0
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     for task in tasks[tg_id]:
         completed = task["completed"]
         if completed:

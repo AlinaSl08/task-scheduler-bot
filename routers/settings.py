@@ -21,7 +21,7 @@ async def settings_task(call: CallbackQuery):
 async def task_all(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if settings_default[tg_id]['format_output'] == number:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=format_output_keyboard())
@@ -49,7 +49,7 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     #сделать постоянную сортировку
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if settings_default[tg_id]['sort'] == number:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=sorting_keyboard())
@@ -78,7 +78,7 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
 async def utc_selection(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if settings_default[tg_id]['timezone'] == number:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
@@ -128,4 +128,6 @@ async def cancel_setting(call: CallbackQuery, state: FSMContext):
     elif comm == "back":
         await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
     await call.answer()
+
+
 

@@ -10,7 +10,7 @@ def completed_keyboard():
     return kb.as_markup()
 
 
-def completed_task_keyboard(tg_id: int, task_list=tasks):
+def completed_task_keyboard(tg_id: str, task_list=tasks):
     kb = InlineKeyboardBuilder()
     count = 0
     if settings_default[tg_id]["format_output"] == 1:
@@ -23,7 +23,14 @@ def completed_task_keyboard(tg_id: int, task_list=tasks):
                 count += 1
 
     if settings_default[tg_id]["format_output"] == 2:
-        print("Ждет доработки")
+        for i in range(1, len(task_list.split('\n\n'))):
+            task = task_list.split('\n\n')[i]
+            if "✅" in task:
+                kb.button(text=f"✅ {i}", callback_data=f"completed_task_{i}")
+                count += 1
+            else:
+                kb.button(text=f"{i}", callback_data=f"completed_task_{i}")
+                count += 1
 
     if settings_default[tg_id]["format_output"] == 3:
         for i in range(1, len(task_list.split('\n\n'))):

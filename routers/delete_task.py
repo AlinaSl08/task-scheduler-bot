@@ -15,7 +15,7 @@ delete_task_router = Router()
 @delete_task_router.callback_query(F.data == "delete")
 async def delete_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     if len(tasks[tg_id]) == 0:
         await call.message.answer("😊 Нет задач, которые можно удалить")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
@@ -30,7 +30,7 @@ async def delete_task(call: CallbackQuery, state: FSMContext):
 
 @delete_task_router.callback_query(F.data.startswith("del_task_"))
 async def delete(call: CallbackQuery, state: FSMContext):
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     await safe_delete(call.message)
     number_task = int(call.data.split("_")[2])
     await state.update_data(number_task=number_task)
@@ -63,7 +63,7 @@ async def delete_yes(call: CallbackQuery, state: FSMContext):
     await call.bot.delete_message(chat_id=call.message.chat.id,
                                   message_id=tasks_message)
     number_task = data.get("number_task")
-    tg_id = call.from_user.id
+    tg_id = str(call.from_user.id)
     del tasks[tg_id][number_task - 1]
     await call.message.answer("✅ Задача успешно удалена!")
     print(tasks)
