@@ -34,7 +34,7 @@ def get_date_keyboard(current_month=1, current_year=2026, cap=" ", mode_key=1):
         else:
             kb.button(text=f"{day}", callback_data=f"date_{mode}_{day}")
     if mode_key == 2:
-        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change")
+        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
         kb.adjust(3, 7, 7, 7, 7, 7, 7, 1)
     else:
         kb.adjust(3, 7, 7, 7, 7, 7, 7)
@@ -48,50 +48,77 @@ current_datetime = datetime.now() ---> current_day = current_datetime.day (и т
 '''
 
 # клавиатура часов
-def get_time_hour_keyboard(page=1):
+def get_time_hour_keyboard(page=1, mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
     if page == 1:
         for i in range(0, 12):
-            kb.button(text=str(i), callback_data=f"hour_{i}")
-        kb.button(text=">", callback_data=f"next_hour")
+            kb.button(text=str(i), callback_data=f"hour_{mode}_{i}")
+        kb.button(text=">", callback_data=f"next_hour_{mode}")
+        if mode == "edit":
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
+
     elif page == 2:
         for i in range(12, 24):
-            kb.button(text=str(i), callback_data=f"hour_{i}")
-        kb.button(text="<", callback_data=f"prev_hour")
-    kb.adjust(3, 3, 3, 3, 2)
+            kb.button(text=str(i), callback_data=f"hour_{mode}_{i}")
+        kb.button(text="<", callback_data=f"prev_hour_{mode}")
+        if mode == "edit":
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
+    kb.adjust(3, 3, 3, 3, 1, 1)
     return kb.as_markup()
 
 # клавиатура минут
-def get_time_minute_keyboard(hour="00"): #тут подставить выбранный час в текст, пример : 15:(текст кнопки)
+def get_time_minute_keyboard(hour="00", mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
     for i in range(0, 6):
-        kb.button(text=f'{hour}:{i}0', callback_data=f"time_{hour}:{i}0")
-        kb.button(text=f'{hour}:{i}5', callback_data=f"time_{hour}:{i}5")
+        kb.button(text=f'{hour}:{i}0', callback_data=f"time_{mode}_{hour}:{i}0")
+        kb.button(text=f'{hour}:{i}5', callback_data=f"time_{mode}_{hour}:{i}5")
+    if mode == "edit":
+        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
     kb.adjust(4, 4)
     return kb.as_markup()
 
 # клавиатура периода
-def get_period_keyboard(selected=[0, 0, 0, 0, 0, 0, 0], no_period=0):
+def get_period_keyboard(selected=[0, 0, 0, 0, 0, 0, 0], no_period=0, mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
     for i in range(len(selected)):
         smile = ""
         if selected[i] == 1:
             smile = "✅ "
-        kb.button(text=f'{smile}{days[i]}', callback_data=f"period_{i}")
+        kb.button(text=f'{smile}{days[i]}', callback_data=f"period_{mode}_{i}")
     if no_period == 1:
-        kb.button(text="Продолжить", callback_data=f"continue_get_period")
+        if mode == "add":
+            kb.button(text="Продолжить", callback_data=f"continue_get_period")
+        else:
+            kb.button(text="✅ Сохранить", callback_data=f"continue_get_period_edit")
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
     else:
-        kb.button(text="Не повторять", callback_data=f"no_period")
+        if mode == "add":
+            kb.button(text="Не повторять", callback_data=f"no_period")
+        else:
+            kb.button(text="Не повторять", callback_data=f"no_period_edit")
+            kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
     kb.adjust(2, 2, 2, 2)
     return kb.as_markup()
 
 # клавиатура уведомления
-def get_notification_keyboard(): # гпт советует использовать CallbackData, но я не поняла
+def get_notification_keyboard(mode_key=1):
+    modes = {1: "add", 2: "edit"}
+    mode = modes[mode_key]
     kb = InlineKeyboardBuilder()
-    kb.button(text="🔔 10 минут", callback_data="notification_10")
-    kb.button(text="⏳ 30 минут", callback_data="notification_30")
-    kb.button(text="🕐 1 час", callback_data="notification_60")
-    kb.button(text="🕒 2 часа", callback_data="notification_120")
-    kb.button(text="🚫 Не напоминать", callback_data="no_notification")
-    kb.adjust(2, 2, 1)
+    kb.button(text="🔔 10 минут", callback_data=f"notification_{mode}_10")
+    kb.button(text="⏳ 30 минут", callback_data=f"notification_{mode}_30")
+    kb.button(text="🕐 1 час", callback_data=f"notification_{mode}_60")
+    kb.button(text="🕒 2 часа", callback_data=f"notification_{mode}_120")
+    kb.button(text="🚫 Не напоминать", callback_data=f"no_notification_{mode}")
+    if mode == "edit":
+        kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
+        kb.adjust(2, 2, 2)
+    else:
+        kb.adjust(2, 2, 1)
     return kb.as_markup()

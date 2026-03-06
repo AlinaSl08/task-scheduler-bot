@@ -1,6 +1,7 @@
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
+from aiogram import Bot
 from states.add_task import AddTask
 from datetime import datetime
 from utils.delete_last_message import safe_delete, delete_last_message
@@ -10,6 +11,12 @@ from keyboards.main_kb import main_menu_keyboard
 from storage.tasks import tasks
 from commands.command import DATA_FILE_PATH
 from states.edit_task import EditTask
+from states.menu import Menu
+import uuid
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+
+
 
 add_task_router = Router()
 
@@ -25,40 +32,66 @@ async def add_task(call: CallbackQuery, state: FSMContext):
     await state.set_state(AddTask.name) #задает начало цепочки(откуда стартовать)
 
 # часы 1 часть
-@add_task_router.callback_query(F.data == "next_hour")
+@add_task_router.callback_query(F.data.startswith("next_hour"))
 async def next_hour(call: CallbackQuery):
-    await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2))
+    mode_time = call.data.split("_")[2]
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2, mode_key=1))
+    else:
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(2, mode_key=2))
 
 # часы 2 часть
-@add_task_router.callback_query(F.data == "prev_hour")
+@add_task_router.callback_query(F.data.startswith("prev_hour"))
 async def prev_hour(call: CallbackQuery):
-    await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1))
+    mode_time = call.data.split("_")[2]
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1, mode_key=1))
+    else:
+        await call.message.edit_reply_markup(reply_markup=get_time_hour_keyboard(1, mode_key=2))
 
-# минуты
+# часы
 @add_task_router.callback_query(F.data.startswith("hour_"))
 async def hour_task(call: CallbackQuery, state: FSMContext):
-    hour = call.data.split("_")[1]
+    hour = call.data.split("_")[2]
+    mode_time = call.data.split("_")[1]
     data = await state.get_data()
-    today_date = data.get("real_date_str")
-    selected_date = data.get("date")
+
+    if mode_time == "add":
+        today_date = data.get("real_date_str")
+        selected_date = data.get("date")
+    else:
+        today_date = data.get("real_date_str")
+        number_task = data.get("number_task")
+        tg_id = str(call.from_user.id)
+        date_day = tasks[tg_id][number_task - 1]["date"]["day"]
+        date_month = tasks[tg_id][number_task - 1]["date"]["month"]
+        date_year = tasks[tg_id][number_task - 1]["date"]["year"]
+        date_str = f"{date_day}.{date_month}.{date_year}"
+        selected_date = date_str
+
     now = datetime.now()
-    today_time = now.strftime("%H:%M:%S").split(":")
+    today_time = now.strftime("%H:%M:%S").split(":") #время сейчас
     if len(hour) == 1:
         hour = "0" + hour
     same_hour = 0
-    if today_date == selected_date:
+    if today_date == selected_date: #если дата выбрана такая же, как сейчас, делаем проверку
         if today_time[0] == hour:
             same_hour = 1 #если час такой же как сейчас
         elif today_time[0] > hour:
             await call.answer("Час уже прошел, попробуйте снова")
             return
     await state.update_data(same_hour=same_hour)
-    await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour))
+    if mode_time == "add":
+        await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour, mode_key=1))
+    else:
+        bot_msg = await call.message.edit_reply_markup(reply_markup=get_time_minute_keyboard(hour, mode_key=2))
+        await state.update_data(bot_msg_id=bot_msg.message_id)
 
-# переход от времени к периоду
+# переход от времени к периоду, проверка минут
 @add_task_router.callback_query(F.data.startswith("time_"))
 async def time_task(call: CallbackQuery, state: FSMContext):
-    time = call.data.split("_")[1]
+    time = call.data.split("_")[2]
+    mode_time = call.data.split("_")[1]
     minute = time.split(":")[1]
     hour = time.split(":")[0]
     data = await state.get_data()
@@ -68,15 +101,32 @@ async def time_task(call: CallbackQuery, state: FSMContext):
     today_time = now.strftime("%H:%M:%S").split(":")
     if same_hour == 1 and int(today_time[1]) >= int(minute):
         await call.answer("Время уже прошло, попробуйте снова")
-        await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour))
+        if mode_time == "add":
+            await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour, mode_key=1))
+        else:
+            await call.message.answer("Выберите время выполнения задачи:", reply_markup=get_time_minute_keyboard(hour, mode_key=2))
         await call.answer()
         return
-    selected = [0, 0, 0, 0, 0, 0, 0]
-    bot_msg = await call.message.answer("По каким дням недели будет повторяться задача?:",
-                                   reply_markup=get_period_keyboard())
-    await state.update_data(time=time, last_msg_id=bot_msg.message_id, selected_days=selected)
-    await state.set_state(AddTask.period)
-    await call.answer()
+    if mode_time == "add":
+        selected = [0, 0, 0, 0, 0, 0, 0]
+        bot_msg = await call.message.answer("По каким дням недели будет повторяться задача?:",
+                                       reply_markup=get_period_keyboard())
+        await state.update_data(time=time, last_msg_id=bot_msg.message_id, selected_days=selected)
+        await state.set_state(AddTask.period)
+        await call.answer()
+    else:
+        tg_id = str(call.from_user.id)
+        number_task = data.get("number_task")
+        tasks[tg_id][number_task - 1]["time"]["hour"] = hour
+        tasks[tg_id][number_task - 1]["time"]["minute"] = minute
+        tasks_message_id_out = data.get("tasks_list_id")
+        await delete_last_message(tasks_message_id_out, call.message)
+        await call.message.answer("✅ Время задачи изменено!")
+        save_to_file(DATA_FILE_PATH, tasks)
+        await state.clear()
+        await state.set_state(Menu.menu)
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
 
 # без периода повторения
 @add_task_router.callback_query(F.data == "no_period")
@@ -95,7 +145,8 @@ async def period_no(call: CallbackQuery, state: FSMContext):
 @add_task_router.callback_query(F.data.startswith("period_"))
 async def period_task(call: CallbackQuery, state: FSMContext):
     try:
-        period = int(call.data.split("_")[1])
+        period = int(call.data.split("_")[2])
+        period_mode = call.data.split("_")[1]
         data = await state.get_data()
         selected_days = data.get("selected_days")
 
@@ -104,15 +155,21 @@ async def period_task(call: CallbackQuery, state: FSMContext):
             return
 
         selected_days[period] = 1
-        await call.message.edit_reply_markup(reply_markup=get_period_keyboard(selected=selected_days, no_period=1))
+        if period_mode == "add":
+            await call.message.edit_reply_markup(reply_markup=get_period_keyboard(selected=selected_days, no_period=1, mode_key=1))
+        else:
+            await call.message.edit_reply_markup(reply_markup=get_period_keyboard(selected=selected_days, no_period=1, mode_key=2))
+
         await state.update_data(selected_days=selected_days)
-    except Exception:
+    except Exception as e:
         await call.answer("Произошла ошибка, попробуйте снова")
-        await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        print("Название ошибки: ", e)
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
 
 
-@add_task_router.callback_query(F.data.startswith("continue_get_period"))
+@add_task_router.callback_query(F.data == "continue_get_period")
 async def continue_get_period(call: CallbackQuery, state: FSMContext):
     bot_msg = await call.message.answer("За сколько напомнить о задаче?:", reply_markup=get_notification_keyboard())
     data = await state.get_data()
@@ -132,56 +189,109 @@ def convert_selected_days_to_str(selected_days):
 
 #напоминания до задачи есть
 @add_task_router.callback_query(F.data.startswith("notification_"))
-async def notification_task(call: CallbackQuery, state: FSMContext):
-    notification = int(call.data.split("_")[1])
+async def notification_task(call: CallbackQuery, state: FSMContext, bot: Bot, scheduler: AsyncIOScheduler = None):
+    try:
+        bot = call.bot
+        from utils.scheduler import schedule_single_task
+        notification = int(call.data.split("_")[2])
+        notification_mode = call.data.split("_")[1]
+        tg_id = str(call.from_user.id)
+        data = await state.get_data()
+        if notification_mode == "add":
+            last_msg_id = data.get("last_msg_id")
+            await delete_last_message(last_msg_id, call.message)
 
-    bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
-    data = await state.get_data()
-    last_msg_id = data.get("last_msg_id")
-    await delete_last_message(last_msg_id, call.message)
-    await state.update_data(notification=notification, last_msg_id=bot_msg.message_id)
-    data = await state.get_data()
-    name = data["name"]
-    date = list(map(int, data["date"].split(".")))
-    date = {"day": date[0], "month": date[1], "year": date[2]}
-    time = list(map(int, data["time"].split(":")))
-    time = {"hour": time[0], "minute": time[1]}
-    period = convert_selected_days_to_str(data["selected_days"])
-    notification = data["notification"]
-    completed = False
-    # добавляем задачу в список
-    tg_id = call.from_user.id
-    tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification, "completed": completed})
-    print(tasks)
-    save_to_file(DATA_FILE_PATH, tasks)
-    await state.clear()
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+            name = data["name"]
+            date = list(map(int, data["date"].split(".")))
+            date = {"day": date[0], "month": date[1], "year": date[2]}
+            time = list(map(int, data["time"].split(":")))
+            time = {"hour": time[0], "minute": time[1]}
+            period = convert_selected_days_to_str(data["selected_days"])
+            completed = False
+            # добавляем задачу в список
+            task_data ={"id": str(uuid.uuid4())[:8], "name": name, "date": date, "time": time, "period": period, "notification": notification, "completed": completed}
+            if tg_id not in tasks:
+                tasks[tg_id] = []  # на случай нового пользователя
+            tasks[tg_id].append(task_data)
+
+            # Сохраняем в файл
+            save_to_file(DATA_FILE_PATH, tasks)
+
+            # Планируем напоминание через scheduler
+            if task_data["notification"] != "Без напоминаний" and scheduler is not None and bot is not None:
+                schedule_single_task(scheduler, bot, tg_id, task_data)
+
+            bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
+            await state.update_data(last_msg_id=bot_msg.message_id)
+            print(tasks)
+        else:
+            number_task = data.get("number_task")
+            tasks[tg_id][number_task - 1]["notification"] = notification
+            bot_msg_id = data.get("bot_msg_id")
+            tasks_message_id_out = data.get("tasks_list_id")
+            await delete_last_message(tasks_message_id_out, call.message)
+            await delete_last_message(bot_msg_id, call.message)
+            await call.message.answer("✅ Напоминание задачи изменено!")
+            save_to_file(DATA_FILE_PATH, tasks)
+        await state.clear()
+        await state.set_state(Menu.menu)
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
+    except Exception as e:
+        print("Ошибка при добавлении задачи.:", e)
+        await call.answer("Ошибка при добавлении задачи.")
+        await call.message.answer("Перезапустите бота через /start")
 
 #не напоминать до задачи
-@add_task_router.callback_query(F.data == "no_notification")
-async def notification_task(call: CallbackQuery, state: FSMContext):
-    notification = "Без напоминаний"
-    bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
-    data = await state.get_data()
-    last_msg_id = data.get("last_msg_id")
-    await delete_last_message(last_msg_id, call.message)
-    await state.update_data(notification=notification, last_msg_id=bot_msg.message_id)
-    data = await state.get_data()
-    name = data["name"]
-    date = list(map(int, data["date"].split(".")))
-    date = {"day": date[0], "month": date[1], "year": date[2]}
-    time = list(map(int, data["time"].split(":")))
-    time = {"hour": time[0], "minute": time[1]}
-    period = data.get("period", "Без повторений")
-    notification = data["notification"]
-    completed = False
-    # добавляем задачу в список
-    tg_id = call.from_user.id
-    tasks[tg_id].append({"name": name, "date": date, "time": time, "period": period, "notification": notification, "completed": completed})
-    print(tasks)
-    save_to_file(DATA_FILE_PATH, tasks)
-    await state.clear()
-    await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+@add_task_router.callback_query(F.data.startswith("no_notification"))
+async def notification_task(call: CallbackQuery, state: FSMContext, bot: Bot, scheduler: AsyncIOScheduler = None):
+    try:
+        bot = call.bot
+        from utils.scheduler import schedule_single_task
+        notification = "Без напоминаний"
+        notification_mode = call.data.split("_")[2]
+        tg_id = str(call.from_user.id)
+        data = await state.get_data()
+        if notification_mode == "add":
+            last_msg_id = data.get("last_msg_id")
+            await delete_last_message(last_msg_id, call.message)
+            name = data["name"]
+            date = list(map(int, data["date"].split(".")))
+            date = {"day": date[0], "month": date[1], "year": date[2]}
+            time = list(map(int, data["time"].split(":")))
+            time = {"hour": time[0], "minute": time[1]}
+            period = data.get("period", "Без повторений")
+            completed = False
+            # добавляем задачу в список
+            task_data = {"id": str(uuid.uuid4())[:8], "name": name, "date": date, "time": time, "period": period, "notification": notification, "completed": completed}
+
+            if tg_id not in tasks:
+                tasks[tg_id] = []  # на случай нового пользователя
+            tasks[tg_id].append(task_data)
+            if scheduler is not None:
+                schedule_single_task(scheduler, bot, tg_id, task_data)
+            save_to_file(DATA_FILE_PATH, tasks)
+            bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
+            await state.update_data(last_msg_id=bot_msg.message_id)
+            print(tasks)
+
+        else:
+            number_task = data.get("number_task")
+            tasks[tg_id][number_task - 1]["notification"] = notification
+            bot_msg_id = data.get("bot_msg_id")
+            tasks_message_id_out = data.get("tasks_list_id")
+            await delete_last_message(tasks_message_id_out, call.message)
+            await delete_last_message(bot_msg_id, call.message)
+            await call.message.answer("✅ Напоминание задачи изменено!")
+            save_to_file(DATA_FILE_PATH, tasks)
+        await state.clear()
+        await state.set_state(Menu.menu)
+        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.update_data(last_msg_id=bot_msg.message_id)
+    except Exception as e:
+        print("Ошибка при добавлении задачи.:", e)
+        await call.answer("Ошибка при добавлении задачи.")
+        await call.message.answer("Перезапустите бота через /start")
 
 #-ФУНКЦИИ КЛАВИАТУРЫ ДАТЫ-
 #если нажмет пустую стрелочку и если нажмет на месяц и год и если нажимает на день недели
@@ -256,13 +366,13 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
         number_task = data.get("number_task")
         now = datetime.now()
         today_time = now.strftime("%H:%M:%S").split(":")
-        tg_id = call.from_user.id
+        tg_id = str(call.from_user.id)
         hour = tasks[tg_id][number_task - 1]["time"]["hour"]
         minute = tasks[tg_id][number_task - 1]["time"]["minute"]
         if len(str(hour)) == 1:
             hour = "0" + hour
         if real_date_str == date_str:
-            if int(today_time[0]) <= hour: # если час такой же как сейчас или больше
+            if int(today_time[0]) <= int(hour): # если час такой же как сейчас или больше
                 if minute <= today_time[1]:
                     await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
                     return
@@ -271,11 +381,18 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
                     tasks[tg_id][number_task - 1]['date']['month'] = date_str.split(".")[1]
                     tasks[tg_id][number_task - 1]['date']['year'] = date_str.split(".")[2]
                     save_to_file(DATA_FILE_PATH, tasks)
+                    tasks_message_id_out = data.get("tasks_list_id")
+                    await delete_last_message(tasks_message_id_out, call.message)
                     await safe_delete(call.message)
                     await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
                     await state.set_state(EditTask.date)
+                    await state.clear()
+                    await state.set_state(Menu.menu)
+                    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+                    await state.update_data(last_msg_id=bot_msg.message_id)
+                    await call.answer()
                     return
-            elif int(today_time[0]) > hour:
+            elif int(today_time[0]) > int(hour):
                 await call.answer("Невозможно выбрать эту дату! Измените сначала время задачи")
                 return
         else:
@@ -283,10 +400,14 @@ async def choose_date(call: CallbackQuery, state: FSMContext):
             tasks[tg_id][number_task - 1]['date']['month'] = date_str.split(".")[1]
             tasks[tg_id][number_task - 1]['date']['year'] = date_str.split(".")[2]
             save_to_file(DATA_FILE_PATH, tasks)
+            tasks_message_id_out = data.get("tasks_list_id")
+            await delete_last_message(tasks_message_id_out, call.message)
             await safe_delete(call.message)
             await call.message.answer("✅ Дата выполнения задачи успешно изменена!")
-            await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
             await state.clear()
+            await state.set_state(Menu.menu)
+            bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+            await state.update_data(last_msg_id=bot_msg.message_id)
             await call.answer()
             return
     else:
@@ -321,7 +442,7 @@ async def get_name(message: Message, state: FSMContext): #название за�
     bot_msg = await message.answer("Выберите дату выполнения задачи:",
                                    reply_markup=get_date_keyboard(current_month=current_month,
                                                                   current_year=current_year))
-    await state.update_data( last_msg_id=bot_msg.message_id)
+    await state.update_data(last_msg_id=bot_msg.message_id)
     await state.set_state(AddTask.date)
 
 # добавляем дату

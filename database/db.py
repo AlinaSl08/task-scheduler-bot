@@ -16,9 +16,8 @@ def read_from_file(file_name, dictionary):
         with open(file_name, 'r', encoding='utf8') as f:
             json_input = f.read()
             info = json.loads(json_input)
-            print(dictionary)
             for key, item in info.items():
-                dictionary[int(key)] = item
+                dictionary[key] = item
             print(dictionary)
     except Exception as e:
         print("Произошла ошибка, при считывании файла:", e)
