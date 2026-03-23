@@ -13,6 +13,7 @@ from keyboards.main_kb import main_menu_keyboard
 import datetime
 import os
 import pymorphy3
+from database.database import database
 
 morph = pymorphy3.MorphAnalyzer()
 
@@ -32,8 +33,8 @@ commands_router = Router()
 os.makedirs(DATA_DIR, exist_ok=True)
 
 
-read_from_file(DATA_FILE_PATH, tasks)
-read_from_file(SETTINGS_FILE_PATH, settings_default)
+#read_from_file(DATA_FILE_PATH, tasks)
+#read_from_file(SETTINGS_FILE_PATH, settings_default)
 
 
 settings_transcript = {
@@ -54,11 +55,8 @@ settings_transcript = {
 @commands_router.message(Command("start"))
 async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)
     user_id = str(message.chat.id)
-    if user_id not in tasks:
-        tasks[user_id] = [] #тут сохраняется строка
-        settings_default[user_id] = {'format_output': 1, 'sort': 1, 'timezone': 0}
-        save_to_file(DATA_FILE_PATH, tasks)
-        save_to_file(SETTINGS_FILE_PATH, settings_default)
+    if not database.is_exist_user(user_id):
+        database.get_new_user(user_id)
         bot_msg = await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания."
                                        "\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
         await state.update_data(start_msg=bot_msg.message_id)
@@ -68,10 +66,6 @@ async def start(message: Message, state: FSMContext): #обозначаем чт
         bot_msg = await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.set_state(Menu.menu)
         await state.update_data(last_msg_id=bot_msg.message_id)
-
-
-
-
 
 @commands_router.message(Auth.timezone)
 async def ignore_timezone(message: Message, state: FSMContext):
@@ -85,21 +79,18 @@ async def ignore_timezone(message: Message, state: FSMContext):
     await delete_last_message(last_msg_id, message)
     await state.update_data(last_msg_id=bot_msg.message_id)
 
-
-
 #сохранение часового пояса по умолчанию
 @commands_router.callback_query(F.data.startswith ("default_utc_"))
 async def utc_selection_default(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[2])
     tg_id = str(call.from_user.id)
-    settings_default[tg_id]['timezone'] = number
-    print(settings_default)
-    save_to_file(SETTINGS_FILE_PATH, settings_default)
+    user_id = database.get_user_id(tg_id)
+    timezone_id = database.get_timezone_id(number)
+    database.set_default_settings(user_id, timezone_id) #установка дефолтных настроек
     await call.answer("Настройки применены!")
     await state.set_state(Menu.menu)
     await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-
 
 @commands_router.message(Command("help"))
 async def help(message: Message):
