@@ -7,7 +7,6 @@ PASSWORD = os.getenv("PASSWORD_DB")
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 
-# как сделать меньше cursor = conn.cursor() и cursor.close(), сделать потом with
 
 class Database:
     def __init__(self, db_host, db_user, password, port):
@@ -27,79 +26,80 @@ class Database:
             print("Подключение не удалось! Ошибка:", e)
 
     def init_db(self):
-        cursor = self.__conn.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS tasks_scheduler_db")
-        cursor.execute("USE tasks_scheduler_db")
-        #cursor.execute('DROP TABLE IF EXISTS periods, tasks, settings, users, format_outputs, timezones, sortings, notifications, weekdays;')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS users(
-                        id INT PRIMARY KEY AUTO_INCREMENT,
-                        tg_id INT NOT NULL)''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS format_outputs(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         format VARCHAR(100) NOT NULL UNIQUE);''')
-        cursor.execute('''INSERT IGNORE INTO format_outputs(format)
-                        VALUES 
-                        ('Все задачи'), 
-                        ('Задачи на неделю'), 
-                        ('Задачи на сегодня');''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS timezones(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         utc INT NOT NULL UNIQUE);''')
-        cursor.execute('''INSERT IGNORE INTO timezones(utc)
-                        VALUES
-                        (-1), (0), (1), (2), (3), (4),
-                        (5), (6), (7), (8), (9);''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS sortings(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         format VARCHAR(100) NOT NULL UNIQUE);''')
-        cursor.execute('''INSERT IGNORE INTO sortings(format)
-                        VALUES
-                        ('По порядку'), ('По названию'),
-                        ('По дате');''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS notifications(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         notification INT NULL UNIQUE);''')
-        cursor.execute('''INSERT IGNORE INTO notifications(notification)
-                        VALUES
-                        ('10'), ('30'),
-                        ('60'), ('120');''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS weekdays(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         day VARCHAR(10) NULL UNIQUE);''')
-        cursor.execute('''INSERT IGNORE INTO weekdays(day)
-                        VALUES
-                        ('Пн'), ('Вт'), ('Ср'), ('Чт'),
-                        ('Пт'), ('Сб'), ('Вс');''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS settings(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         user_id INT NOT NULL, 
-                         timezone_id INT NOT NULL,
-                         format_output_id INT NOT NULL, 
-                         sorting_id INT NOT NULL,
-                         FOREIGN KEY (user_id) REFERENCES users(id),
-                         FOREIGN KEY (timezone_id) REFERENCES timezones(id),
-                         FOREIGN KEY (format_output_id) REFERENCES format_outputs(id),
-                         FOREIGN KEY (sorting_id) REFERENCES sortings(id));''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS tasks(
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         user_id INT NOT NULL, 
-                         name VARCHAR(200) NOT NULL,
-                         date DATE NOT NULL, 
-                         time TIME NOT NULL,
-                         notification_id INT NULL, 
-                         is_status TINYINT NOT NULL,
-                         FOREIGN KEY (user_id) REFERENCES users(id),
-                         FOREIGN KEY (notification_id) REFERENCES notifications(id));''')
-        cursor.execute('''CREATE TABLE IF NOT EXISTS periods (
-                         id INT PRIMARY KEY AUTO_INCREMENT,
-                         task_id INT NOT NULL,
-                         weekday_id INT NOT NULL,
-                         FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-                         FOREIGN KEY (weekday_id) REFERENCES weekdays(id),
-                         UNIQUE(task_id, weekday_id));''')
+        with self.__conn.cursor() as cursor:
+            cursor.execute("CREATE DATABASE IF NOT EXISTS tasks_scheduler_db")
+            cursor.execute("USE tasks_scheduler_db")
+            #cursor.execute('DROP TABLE IF EXISTS periods, tasks, settings, users, format_outputs, timezones, sortings, notifications, weekdays;')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS users(
+                            id INT PRIMARY KEY AUTO_INCREMENT,
+                            tg_id INT NOT NULL)''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS format_outputs(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             format VARCHAR(100) NOT NULL UNIQUE);''')
+            cursor.execute('''INSERT IGNORE INTO format_outputs(format)
+                            VALUES 
+                            ('Все задачи'), 
+                            ('Задачи на неделю'), 
+                            ('Задачи на сегодня');''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS timezones(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             utc INT NOT NULL UNIQUE);''')
+            cursor.execute('''INSERT IGNORE INTO timezones(utc)
+                            VALUES
+                            (-1), (0), (1), (2), (3), (4),
+                            (5), (6), (7), (8), (9);''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS sortings(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             format VARCHAR(100) NOT NULL UNIQUE);''')
+            cursor.execute('''INSERT IGNORE INTO sortings(format)
+                            VALUES
+                            ('По порядку'), ('По названию'),
+                            ('По дате');''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS notifications(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             notification INT NULL UNIQUE);''')
+            cursor.execute('''INSERT IGNORE INTO notifications(notification)
+                            VALUES
+                            ('10'), ('30'),
+                            ('60'), ('120');''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS weekdays(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             day VARCHAR(10) NULL UNIQUE);''')
+            cursor.execute('''INSERT IGNORE INTO weekdays(day)
+                            VALUES
+                            ('Пн'), ('Вт'), ('Ср'), ('Чт'),
+                            ('Пт'), ('Сб'), ('Вс');''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS settings(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             user_id INT NOT NULL, 
+                             timezone_id INT NOT NULL,
+                             format_output_id INT NOT NULL, 
+                             sorting_id INT NOT NULL,
+                             FOREIGN KEY (user_id) REFERENCES users(id),
+                             FOREIGN KEY (timezone_id) REFERENCES timezones(id),
+                             FOREIGN KEY (format_output_id) REFERENCES format_outputs(id),
+                             FOREIGN KEY (sorting_id) REFERENCES sortings(id));''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS tasks(
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             user_id INT NOT NULL, 
+                             name VARCHAR(200) NOT NULL,
+                             date DATE NOT NULL, 
+                             time TIME NOT NULL,
+                             notification_id INT NULL, 
+                             is_status TINYINT NOT NULL,
+                             FOREIGN KEY (user_id) REFERENCES users(id),
+                             FOREIGN KEY (notification_id) REFERENCES notifications(id));''')
+            cursor.execute('''CREATE TABLE IF NOT EXISTS periods (
+                             id INT PRIMARY KEY AUTO_INCREMENT,
+                             task_id INT NOT NULL,
+                             weekday_id INT NOT NULL,
+                             FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                             FOREIGN KEY (weekday_id) REFERENCES weekdays(id),
+                             UNIQUE(task_id, weekday_id));''')
         self.__conn.commit()
-        cursor.close()
 
+    # --ПРОВЕРКА--
+    # есть ли юзер в системе
     def is_exist_user(self, tg_id):
         with self.__conn.cursor() as cursor:
             cursor.execute('SELECT * FROM users WHERE tg_id = %s', (tg_id,))
@@ -109,128 +109,117 @@ class Database:
             else:
                 return False
 
+
     # --ДОБАВЛЕНИЕ--
     # добавляем нового пользователя
     def get_new_user(self, tg_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('INSERT INTO users(tg_id) VALUES (%s)', (tg_id,))
+        with self.__conn.cursor() as cursor:
+            cursor.execute('INSERT INTO users(tg_id) VALUES (%s)', (tg_id,))
         self.__conn.commit()
-        cursor.close()
 
     # выставляем дефолтные настройки
     def set_default_settings(self, user_id, timezone):
-        cursor = self.__conn.cursor()
-        cursor.execute('''INSERT INTO settings(user_id, timezone_id, format_output_id, sorting_id)
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''INSERT INTO settings(user_id, timezone_id, format_output_id, sorting_id)
                             VALUES (%s, %s, %s, %s)''', (user_id, timezone, 1, 1))
         self.__conn.commit()
-        cursor.close()
 
     # сохранение задачи после добавления
     def save_task(self, user_id, name, date, time, notification_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''INSERT INTO tasks(user_id, name, date, time, notification_id, is_status)
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''INSERT INTO tasks(user_id, name, date, time, notification_id, is_status)
                                 VALUES (%s, %s, %s, %s, %s, %s)''', (user_id, name, date, time, notification_id, 0))
         self.__conn.commit()
-        cursor.close()
 
     # сохранение периода задачи после добавления\изменение периода 2 (добавление новых записей)
     def save_period_task(self, task_id, weekday_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''INSERT INTO periods(task_id, weekday_id)
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''INSERT INTO periods(task_id, weekday_id)
                                 VALUES (%s, %s)''', (task_id, weekday_id,))
         self.__conn.commit()
-        cursor.close()
+
 
     # --ОБНОВЛЕНИЯ--
     # выставляем первичный часовой пояс\изменение настроек (часовой пояс)
     def update_timezone_settings(self, user_id, timezone):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE settings 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE settings 
                         SET timezone_id = %s
                         WHERE user_id = %s ''', (timezone, user_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение настроек (формат вывода)
     def update_format_output_settings(self, user_id, format_output_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE settings 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE settings 
                         SET format_output_id = %s
                         WHERE user_id = %s ''', (format_output_id, user_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение настроек (сортировка)
     def update_sorting_settings(self, user_id, sorting_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE settings 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE settings 
                         SET sorting_id = %s
                         WHERE user_id = %s ''', (sorting_id, user_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение имени
     def edit_name_task(self, task_id, new_name):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE tasks 
                         SET name  = %s
                         WHERE id = %s''', (new_name, task_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение даты
     def edit_date_task(self, task_id, new_date):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE tasks 
                         SET date  = %s
                         WHERE id = %s''', (new_date, task_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение времени
     def edit_time_task(self, task_id, new_time):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE tasks 
                         SET time = %s
                         WHERE id = %s''', (new_time, task_id,))
         self.__conn.commit()
-        cursor.close()
 
     # изменение напоминания
     def edit_notification_task(self, task_id, new_notification):
-        cursor = self.__conn.cursor()
-        cursor.execute('''UPDATE tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE tasks 
                         SET notification_id  = %s
                         WHERE id = %s''', (new_notification, task_id,))
         self.__conn.commit()
-        cursor.close()
+
 
     # --УДАЛЕНИЕ--
-
     # изменение периода 1
     def delete_old_period_task(self, task_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''DELETE FROM periods 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''DELETE FROM periods 
                         WHERE task_id = %s''', (task_id,))
         self.__conn.commit()
-        cursor.close()
 
     # очищение всего списка задач пользователя 2
     def clear_all_task_list(self, user_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''DELETE FROM tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''DELETE FROM tasks 
                         WHERE user_id = %s''', (user_id,))
         self.__conn.commit()
-        cursor.close()
 
     # удаление задачи
     def delete_task(self, user_id, task_id):
-        cursor = self.__conn.cursor()
-        cursor.execute('''DELETE FROM tasks 
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''DELETE FROM tasks 
                         WHERE user_id = %s AND id = %s''',
                        (user_id, task_id,))
         self.__conn.commit()
-        cursor.close()
+
 
     # --ВЫВОДЫ--
     #получаем айди юзера
@@ -247,6 +236,13 @@ class Database:
             row = cursor.fetchone()
             return row[0] if row else None
 
+    #по айди получаем значение часового пояса
+    def get_timezone(self, timezone_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''SELECT utc FROM timezones WHERE id = %s''', (timezone_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     # получаем айди формата вывода
     def get_format_outputs_id(self, format_output):
         with self.__conn.cursor() as cursor:
@@ -254,10 +250,24 @@ class Database:
             row = cursor.fetchone()
             return row[0] if row else None
 
+    # по айди получаем значение формата вывода
+    def get_format_outputs(self, format_output_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''SELECT format FROM format_outputs WHERE id = %s''', (format_output_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     # получаем айди сортировки
     def get_sorting_id(self, format_sorting):
         with self.__conn.cursor() as cursor:
             cursor.execute('''SELECT id FROM sortings WHERE format = %s''', (format_sorting,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    # по айди получаем значение сортировки
+    def get_sorting(self, format_sorting_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''SELECT format FROM sortings WHERE id = %s''', (format_sorting_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
@@ -350,9 +360,6 @@ class Database:
     # отключаемся от бд
     def close_conn(self):
         self.__conn.close()
-
-
-
 
 database = Database(DB_HOST, DB_USER, PASSWORD,3306)
 

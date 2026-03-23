@@ -37,20 +37,9 @@ os.makedirs(DATA_DIR, exist_ok=True)
 #read_from_file(SETTINGS_FILE_PATH, settings_default)
 
 
-settings_transcript = {
-    "timezone":{
-        0: "МСК", -1: "МСК-1", 2: "МСК+1", 3: "МСК+2", 4: "МСК+3", 5: "МСК+4",
-        6: "МСК+5", 7: "МСК+6", 8: "МСК+7", 9: "МСК+8", 10: "МСК+9"},
-    "sort":{
-        1: "По порядку",
-        2: "По названию",
-        3: "По дате",
-        4: "По времени"},
-    "format_output": {
-        1: "Все задачи",
-        2: "Задачи на неделю",
-        3: "Задачи сегодня"}
-    }
+timezone_transcript = {-1: "МСК-1", 0: "МСК", 1: "МСК+1", 2: "МСК+2", 3: "МСК+3", 4: "МСК+4",
+        5: "МСК+5", 6: "МСК+6", 7: "МСК+7", 8: "МСК+8", 9: "МСК+9"}
+
 
 @commands_router.message(Command("start"))
 async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)
@@ -103,14 +92,18 @@ async def menu(message: Message, state: FSMContext):
     await state.update_data(last_msg_id=bot_msg.message_id)
 
 def settings_output(tg_id):
-    tz = settings_default[tg_id]['timezone']
-    srt = settings_default[tg_id]['sort']
-    form_out = settings_default[tg_id]['format_output']
-    return (f'⚙️ Ваши настройки:\n\n🌍 Часовой пояс: {settings_transcript["timezone"][tz]}\n'
-            f'📌 Сортировка: {settings_transcript["sort"][srt]}\n'
-            f'📄 Формат вывода задач: {settings_transcript["format_output"][form_out]}\n'
+    user_id = database.get_user_id(tg_id)
+    settings_tuple = database.output_settings(user_id)
+    tz = settings_tuple[2]
+    form_out = settings_tuple[3]
+    srt = settings_tuple[4]
+    timezone = database.get_timezone(tz)
+    format_output = database.get_format_outputs(form_out)
+    sorting = database.get_sorting(srt)
+    return (f'⚙️ Ваши настройки:\n\n🌍 Часовой пояс: {timezone_transcript[timezone]}\n'
+            f'📌 Сортировка: {sorting}\n'
+            f'📄 Формат вывода задач: {format_output}\n'
             f'\nЧтобы изменить параметры, откройте раздел «Настройки» в главном меню.')
-
 
 #вывод настроек пользователя
 @commands_router.message(Command("settings"))
@@ -139,10 +132,12 @@ async def report_tasks_by_week(call: CallbackQuery):
     result = call.data.split("_")[0]
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
     current_date = datetime.date.today() #сегодняшняя дата
     days_till_monday = datetime.date.weekday(current_date)
     count_completed = 0
     count_expired = 0
+    tasks_list = [] #доделать
     for task in tasks[tg_id]:
         day = task["date"]["day"]
         month = task["date"]["month"]
@@ -199,15 +194,10 @@ async def report_cancel(call: CallbackQuery):
     await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
     await call.answer()
 
-
-
-
 #отчет по выполненным и просроченным задачам
 @commands_router.message(Command("report")) #если пишет текстом, нужно уведа
 async def report(message: Message):
     await message.answer("Какой отчет желаете получить?", reply_markup=report_keyboard())
-
-
 
 # создание подсказать к командам при вводе /
 async def set_bot_commands(bot):
@@ -219,9 +209,6 @@ async def set_bot_commands(bot):
         BotCommand(command="report", description="Отчет по выполненным задачам")
     ]
     await bot.set_my_commands(commands) # отправляем телеграм список команд бота
-
-
-
 
 @commands_router.message(F.text)
 async def ignore_menu(message: Message, state: FSMContext):
