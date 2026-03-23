@@ -19,7 +19,7 @@ def report_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🗒️ Отчет за эту неделю", callback_data="this_week")
     kb.button(text="📊 Отчет за прошлую неделю", callback_data="last_week")
-    kb.button(text="🗓️ Отчет за все время", callback_data="general")
+    kb.button(text="🗓️ Отчет за все время", callback_data="report_general")
     kb.button(text="⬅️ Отмена", callback_data="back")
     kb.adjust(1, 1, 1, 1)
     return kb.as_markup()

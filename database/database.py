@@ -29,7 +29,7 @@ class Database:
         with self.__conn.cursor() as cursor:
             cursor.execute("CREATE DATABASE IF NOT EXISTS tasks_scheduler_db")
             cursor.execute("USE tasks_scheduler_db")
-            #cursor.execute('DROP TABLE IF EXISTS periods, tasks, settings, users, format_outputs, timezones, sortings, notifications, weekdays;')
+            #cursor.execute("DROP TABLE IF EXISTS periods, tasks, settings, users, format_outputs, timezones, sortings, notifications, weekdays;")
             cursor.execute('''CREATE TABLE IF NOT EXISTS users(
                             id INT PRIMARY KEY AUTO_INCREMENT,
                             tg_id INT NOT NULL)''')
@@ -59,9 +59,9 @@ class Database:
                              id INT PRIMARY KEY AUTO_INCREMENT,
                              notification INT NULL UNIQUE);''')
             cursor.execute('''INSERT IGNORE INTO notifications(notification)
-                            VALUES
-                            ('10'), ('30'),
-                            ('60'), ('120');''')
+                            VALUES (0),
+                            (10), (30),
+                            (60), (120);''')
             cursor.execute('''CREATE TABLE IF NOT EXISTS weekdays(
                              id INT PRIMARY KEY AUTO_INCREMENT,
                              day VARCHAR(10) NULL UNIQUE);''')
@@ -86,7 +86,7 @@ class Database:
                              date DATE NOT NULL, 
                              time TIME NOT NULL,
                              notification_id INT NULL, 
-                             is_status TINYINT NOT NULL,
+                             is_status TINYINT DEFAULT NULL,
                              FOREIGN KEY (user_id) REFERENCES users(id),
                              FOREIGN KEY (notification_id) REFERENCES notifications(id));''')
             cursor.execute('''CREATE TABLE IF NOT EXISTS periods (
@@ -102,20 +102,18 @@ class Database:
     # есть ли юзер в системе
     def is_exist_user(self, tg_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('SELECT * FROM users WHERE tg_id = %s', (tg_id,))
+            cursor.execute("SELECT * FROM users WHERE tg_id = %s", (tg_id,))
             rows = cursor.fetchall()
-            if rows:
-                return True
-            else:
-                return False
+            return bool(rows)
 
 
     # --ДОБАВЛЕНИЕ--
     # добавляем нового пользователя
-    def get_new_user(self, tg_id):
+    def add_new_user(self, tg_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('INSERT INTO users(tg_id) VALUES (%s)', (tg_id,))
+            cursor.execute("INSERT INTO users(tg_id) VALUES (%s)", (tg_id,))
         self.__conn.commit()
+
 
     # выставляем дефолтные настройки
     def set_default_settings(self, user_id, timezone):
@@ -125,11 +123,13 @@ class Database:
         self.__conn.commit()
 
     # сохранение задачи после добавления
-    def save_task(self, user_id, name, date, time, notification_id):
+    def save_task(self, user_id, name, date, time, notification_id, is_status=None):
         with self.__conn.cursor() as cursor:
             cursor.execute('''INSERT INTO tasks(user_id, name, date, time, notification_id, is_status)
-                                VALUES (%s, %s, %s, %s, %s, %s)''', (user_id, name, date, time, notification_id, 0))
+                                VALUES (%s, %s, %s, %s, %s, %s)''', (user_id, name, date, time, notification_id, is_status))
+            new_id = cursor.lastrowid #получаем айди добавленной только что задачи
         self.__conn.commit()
+        return new_id
 
     # сохранение периода задачи после добавления\изменение периода 2 (добавление новых записей)
     def save_period_task(self, task_id, weekday_id):
@@ -225,63 +225,70 @@ class Database:
     #получаем айди юзера
     def get_user_id(self, user_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM users WHERE tg_id = %s''', (user_id,))
+            cursor.execute("SELECT id FROM users WHERE tg_id = %s", (user_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # получаем айди часового пояса
     def get_timezone_id(self, utc):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM timezones WHERE utc = %s''', (utc,))
+            cursor.execute("SELECT id FROM timezones WHERE utc = %s", (utc,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     #по айди получаем значение часового пояса
     def get_timezone(self, timezone_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT utc FROM timezones WHERE id = %s''', (timezone_id,))
+            cursor.execute("SELECT utc FROM timezones WHERE id = %s", (timezone_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # получаем айди формата вывода
     def get_format_outputs_id(self, format_output):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM format_outputs WHERE format = %s''', (format_output,))
+            cursor.execute("SELECT id FROM format_outputs WHERE format = %s", (format_output,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # по айди получаем значение формата вывода
     def get_format_outputs(self, format_output_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT format FROM format_outputs WHERE id = %s''', (format_output_id,))
+            cursor.execute("SELECT format FROM format_outputs WHERE id = %s", (format_output_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # получаем айди сортировки
     def get_sorting_id(self, format_sorting):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM sortings WHERE format = %s''', (format_sorting,))
+            cursor.execute("SELECT id FROM sortings WHERE format = %s", (format_sorting,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # по айди получаем значение сортировки
     def get_sorting(self, format_sorting_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT format FROM sortings WHERE id = %s''', (format_sorting_id,))
+            cursor.execute("SELECT format FROM sortings WHERE id = %s", (format_sorting_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # получаем айди напоминания
     def get_notification_id(self, notification):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM notifications WHERE notification = %s''', (notification,))
+            cursor.execute("SELECT id FROM notifications WHERE notification = %s", (notification,))
             row = cursor.fetchone()
             return row[0] if row else None
 
     # получаем айди дня недели
     def get_weekday_id(self, day):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM weekdays WHERE day = %s''', (day,))
+            cursor.execute("SELECT id FROM weekdays WHERE day = %s", (day,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    # получаем день недели по айди
+    def get_weekday(self, day_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute("SELECT day FROM weekdays WHERE id = %s", (day_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
@@ -290,7 +297,7 @@ class Database:
     # получаем айди задачи по user_id(тут еще наверное добавить) !!!!!!
     def get_task_id(self, user_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT id FROM tasks WHERE user_id = %s''', (user_id,))
+            cursor.execute("SELECT id FROM tasks WHERE user_id = %s", (user_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 
@@ -300,7 +307,7 @@ class Database:
     # выводим настройки
     def output_settings(self, user_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT * FROM settings WHERE user_id = %s''', (user_id,))
+            cursor.execute("SELECT * FROM settings WHERE user_id = %s", (user_id,))
             return cursor.fetchone()
 
     # выводим всех пользователей (возвращаем список всех строк)
@@ -309,23 +316,18 @@ class Database:
             cursor.execute("SELECT * FROM users")
             return cursor.fetchall()
 
-    # выводим все задачи определенного юзера (без напоминаний)
+    # выводим все задачи определенного юзера
     def get_all_tasks(self, user_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute("SELECT name, date, time, is_status FROM tasks WHERE user_id = %s", (user_id,))
+            cursor.execute("SELECT id, name, date, time, notification_id, is_status FROM tasks WHERE user_id = %s", (user_id,))
             return cursor.fetchall()
 
-    # выводим все задачи определенного юзера (с напоминаниями)
-    def get_all_tasks_notification(self, user_id):
-        with self.__conn.cursor() as cursor:
-            cursor.execute("SELECT name, date, time, notification_id, is_status FROM tasks WHERE user_id = %s", (user_id,))
-            return cursor.fetchall()
-
-    # выводим период задачи (но если нужны все задачи одного юзера, то нужно вывести по юзер_айди?
+    # выводим период задачи
     def output_period_task(self, task_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''SELECT * FROM periods WHERE task_id = %s''', (task_id,))
-            return cursor.fetchall()
+            cursor.execute("SELECT * FROM periods WHERE task_id = %s", (task_id,))
+            rows = cursor.fetchall()
+            return [row[2] for row in rows]
 
     # выводим все задачи определенного юзера на неделю(с пн по настоящий день)
     def get_all_tasks_weekday(self, user_id, current_date):

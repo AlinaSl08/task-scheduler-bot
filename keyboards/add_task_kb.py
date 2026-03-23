@@ -35,7 +35,7 @@ def get_date_keyboard(current_month=1, current_year=2026, cap=" ", mode_key=1):
             kb.button(text=f"{day}", callback_data=f"date_{mode}_{day}")
     if mode_key == 2:
         kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
-        kb.adjust(3, 7, 7, 7, 7, 7, 7, 1)
+        kb.adjust(3, 7, 7, 7, 7, 7, 7, 7, 1)
     else:
         kb.adjust(3, 7, 7, 7, 7, 7, 7)
     return kb.as_markup()
@@ -115,7 +115,7 @@ def get_notification_keyboard(mode_key=1):
     kb.button(text="⏳ 30 минут", callback_data=f"notification_{mode}_30")
     kb.button(text="🕐 1 час", callback_data=f"notification_{mode}_60")
     kb.button(text="🕒 2 часа", callback_data=f"notification_{mode}_120")
-    kb.button(text="🚫 Не напоминать", callback_data=f"no_notification_{mode}")
+    kb.button(text="🚫 Не напоминать", callback_data=f"notification_{mode}_0")
     if mode == "edit":
         kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_2")
         kb.adjust(2, 2, 2)

@@ -43,9 +43,9 @@ timezone_transcript = {-1: "МСК-1", 0: "МСК", 1: "МСК+1", 2: "МСК+2"
 
 @commands_router.message(Command("start"))
 async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)
-    user_id = str(message.chat.id)
+    user_id = int(message.chat.id)
     if not database.is_exist_user(user_id):
-        database.get_new_user(user_id)
+        database.add_new_user(user_id)
         bot_msg = await message.answer("👋 Добро пожаловать!\n\nЭтот бот поможет вам планировать задачи и напоминания."
                                        "\nДля начала выберите ваш часовой пояс:", reply_markup=timezone_keyboard())
         await state.update_data(start_msg=bot_msg.message_id)
@@ -129,57 +129,54 @@ def get_expired_word(count):
 
 @commands_router.callback_query(F.data.endswith("_week"))
 async def report_tasks_by_week(call: CallbackQuery):
+    await call.answer()
     result = call.data.split("_")[0]
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    current_date = datetime.date.today() #сегодняшняя дата
-    days_till_monday = datetime.date.weekday(current_date)
+    tasks_list = database.get_all_tasks(user_id) #список всех задач юзера
+    current_date = datetime.datetime.now()  # сегодняшняя дата и время
+    days_till_monday = datetime.date.weekday(current_date)  # дата понедельника
     count_completed = 0
     count_expired = 0
-    tasks_list = [] #доделать
-    for task in tasks[tg_id]:
-        day = task["date"]["day"]
-        month = task["date"]["month"]
-        year = task["date"]["year"]
-        completed = task["completed"]
-        hour = task['time']["hour"]
-        minute = task['time']["minute"]
-        task_datetime = datetime.datetime(year, month, day, hour, minute)
-        now = datetime.datetime.now()
-        task_date = datetime.date(day=day, month=month, year=year) #дата задачи
+    for task in tasks_list:
+        task_date = task[2] #дата задачи
+        completed = task[5] #выполнено или нет
+        task_time = task[3] #время задачи
+        task_datetime = datetime.datetime.combine(task_date, datetime.time.min) + task_time #дата и время задачи
         if result == "this":
             date_monday = current_date - datetime.timedelta(days=days_till_monday)  # дата прошлого понедельника
-            if task_date >= date_monday and completed:
+            if task_datetime >= date_monday and completed:
                 count_completed += 1
-            elif task_date >= date_monday and task_datetime < now and not completed:
+            elif current_date > task_datetime >= date_monday and str(completed) == '0': #если дата уже прошла и не выполнена, то ставим просрочено
                 count_expired += 1
         else:
             date_last_monday = current_date - datetime.timedelta(days=days_till_monday) - datetime.timedelta(days=7) # дата позапрошлого понедельника
-            if task_date >= date_last_monday and completed:
+            if task_datetime >= date_last_monday and completed:
                 count_completed += 1
-            elif task_date >= date_last_monday and task_datetime < now and not completed:
+            elif current_date > task_datetime >= date_last_monday and str(completed) == '0':
                 count_expired += 1
     if result == "this":
         await call.message.answer(f'📊 Статистика задач:\n\n✅ {get_done_word(count_completed).capitalize()} на этой неделе {count_completed} {get_word("задача", count_completed)}!'
-                                  f'\n⚠️ {get_expired_word(count_expired).capitalize()} на этой неделе {count_expired} {get_word("задача", count_expired)}!')
+                                      f'\n⚠️ {get_expired_word(count_expired).capitalize()} на этой неделе {count_expired} {get_word("задача", count_expired)}!')
     else:
         await call.message.answer(f'📊 Статистика задач:\n\n✅ {get_done_word(count_completed).capitalize()} {count_completed} {get_word("задача", count_completed)} с прошлой недели!'
-                                  f'\n⚠️ {get_expired_word(count_expired).capitalize()} {count_expired} {get_word("задача", count_expired)} с прошлой недели!')
-    await call.message.answer("Добро пожаловать в чат-бота!", reply_markup=main_menu_keyboard())
-    await call.answer()
+                                      f'\n⚠️ {get_expired_word(count_expired).capitalize()} {count_expired} {get_word("задача", count_expired)} с прошлой недели!')
 
-@commands_router.callback_query(F.data == "general")
+
+@commands_router.callback_query(F.data == "report_general")
 async def report_tasks(call: CallbackQuery):
     await safe_delete(call.message)
     count_completed = 0
     count_expired = 0
     tg_id = str(call.from_user.id)
-    for task in tasks[tg_id]:
-        completed = task["completed"]
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
+    for task in tasks_list:
+        completed = task[5]
         if completed:
             count_completed += 1
-        else:
+        elif str(completed) == '0':
             count_expired += 1
     await call.message.answer(
         f'📊 Статистика задач:\n\n✅ Всего {get_done_word(count_completed)} {count_completed} {get_word("задача", count_completed)}!'
@@ -196,8 +193,17 @@ async def report_cancel(call: CallbackQuery):
 
 #отчет по выполненным и просроченным задачам
 @commands_router.message(Command("report")) #если пишет текстом, нужно уведа
-async def report(message: Message):
-    await message.answer("Какой отчет желаете получить?", reply_markup=report_keyboard())
+async def report(message: Message, state: FSMContext):
+    tg_id = str(message.from_user.id)
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
+    if tasks_list: #если задачи есть
+        await message.answer("Какой отчет желаете получить?", reply_markup=report_keyboard())
+    else:
+        await message.answer("Еще не было добавлено ни одной задачи!")
+        bot_msg = await message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        await state.set_state(Menu.menu)
+        await state.update_data(last_msg_id=bot_msg.message_id)
 
 # создание подсказать к командам при вводе /
 async def set_bot_commands(bot):

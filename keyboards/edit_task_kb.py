@@ -1,11 +1,12 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from storage.tasks import tasks
+from database.database import database
 
-def edit_task_keyboard(tg_id: str): #вывод имеющихся задач
+def edit_task_keyboard(tg_id: int): #вывод имеющихся задач
     kb = InlineKeyboardBuilder()
-    for i in range(1, len(tasks[tg_id]) + 1):
+    tasks_list = database.get_all_tasks(tg_id)
+    for i in range(1, len(tasks_list) + 1):
         kb.button(text=f"{i}", callback_data=f"edit_task_{i}")
-    count = len(tasks[tg_id])
+    count = len(tasks_list)
     kb.button(text=f"❎ Отменить изменение", callback_data=f"undo_the_change_1")
     if count <= 4:
         kb.adjust(1)

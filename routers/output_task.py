@@ -8,46 +8,54 @@ from aiogram import Router, F
 from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
 from commands.command import DATA_FILE_PATH
 import datetime
+from database.database import database
 
 
 output_task_router = Router()
 
 #вывод по порядку
-def output_task(tg_id: str, cap="0", str_task=0):
-    tasks_list = ["📌 Список дел:"]
-    for idx, task in enumerate(tasks[tg_id], 1):
-        period = task["period"]
-        notification = task["notification"]
+def output_task(tasks_list, cap="0", str_task=0):
+    tasks_list_out = ["📌 Список дел:"]
+    for idx, task in enumerate(tasks_list, 1):
+        name = task[1].capitalize()
+        date = f"{task[2]:%d.%m.%Y}"
+        time = str(task[3])[:4].zfill(5)
+        notification_id = task[4]
         completed = ""
-        if task["completed"]:
+        if task[5]: #если True
             completed = " ✅"
-        if isinstance(period, list):
-            period_str = ", ".join(period) if period else "Без повторений"
+        task_id = task[0]
+        weekdays_list = database.output_period_task(task_id) #отдельно достаем период
+        periods_list = [database.get_weekday(day) for day in weekdays_list]
+        if isinstance(periods_list, list):
+            period_str = ", ".join(periods_list) if periods_list else "Без повторений"
         else:
-            period_str = period
-        if notification == 10 or notification == 30:
-            notification =  f'Напоминать за {notification} минут.'
-        elif notification == 60:
-            notification = f'Напоминать за 1 час.'
-        elif notification == 120:
-            notification = f'Напоминать за 2 часа.'
-        if cap == "1":
-            task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
-                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
-                         f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}. {notification}')
+            period_str = "Не определен"
+        if notification_id == 2:
+            notification =  'Напоминать за 10 минут.'
+        elif notification_id == 3:
+            notification =  'Напоминать за 30 минут.'
+        elif notification_id == 4:
+            notification = 'Напоминать за 1 час.'
+        elif notification_id == 5:
+            notification = 'Напоминать за 2 часа.'
         else:
-            task_text = (f'{idx}){completed} {task["name"].capitalize()} - '
-                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
-                         f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
-        tasks_list.append(task_text)
+            notification = 'Без напоминаний'
+        if cap == "1": #с напоминаниями вывод
+            task_text = (f'{idx}){completed} {name} - '
+                             f'{date} в {time}. Период повторения: {period_str}. {notification}')
+        else: #без напоминаний вывод
+                task_text = (f'{idx}){completed} {name} - '
+                             f'{date} в {time}. Период повторения: {period_str}')
+        tasks_list_out.append(task_text)
     if str_task == 0:
-        full_message = '\n\n'.join(tasks_list)
+        full_message = '\n\n'.join(tasks_list_out)
         return full_message
     else:
-        return tasks_list[str_task][3:]
+        return tasks_list_out[str_task][3:]
 
 def output_task_week(tg_id: str): #тут будет вывод на неделю
-    tasks_list = []
+    tasks_list_out = []
     indexes = []
     for idx, task in enumerate(tasks[tg_id]):
         task_day = int(task["date"]["day"])
@@ -71,10 +79,10 @@ def output_task_week(tg_id: str): #тут будет вывод на недел�
             task_text = (f'{completed} {task["name"].capitalize()} - '
                          f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
                          f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
-            tasks_list.append(task_text)
+            tasks_list_out.append(task_text)
     task_list_out = ["📌 Список дел:"]
-    if len(tasks_list) > 0:
-        for idx, task in enumerate(tasks_list, 1):
+    if len(tasks_list_out) > 0:
+        for idx, task in enumerate(tasks_list_out, 1):
             task_text = (f'{idx}) {task}')
             task_list_out.append(task_text)
         full_message = '\n\n'.join(task_list_out)
@@ -83,7 +91,7 @@ def output_task_week(tg_id: str): #тут будет вывод на недел�
         return False, []
 
 def output_task_today(tg_id: str): #тут будет вывод на сегодня
-    current_datetime = datetime.datetime.now()
+    current_datetime = datetime.datetime.now() #если дата уже прошла и не выполнена, то ставим просрочено
     current_day = current_datetime.day
     current_month = current_datetime.month
     current_year = current_datetime.year

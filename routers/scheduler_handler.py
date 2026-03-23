@@ -4,7 +4,7 @@ from database.db import read_from_file, save_to_file
 
 scheduler_router = Router()
 
-
+#если дата уже прошла и не выполнена, то ставим просрочено, нужно настроить проверку по дате
 
 @scheduler_router.callback_query(F.data.startswith("done_"))
 async def mark_task_done(callback: types.CallbackQuery):
