@@ -3,12 +3,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram import Router, F
 from utils.delete_last_message import safe_delete, delete_last_message
 from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import tasks
 from keyboards.edit_task_kb import edit_task_keyboard, task_change_keyboard
 from routers.output_task import output_task
 from states.edit_task import EditTask
-from database.db import save_to_file
-from commands.command import DATA_FILE_PATH
 from keyboards.add_task_kb import get_date_keyboard, get_period_keyboard, get_notification_keyboard, get_time_hour_keyboard
 from routers.add_task import convert_selected_days_to_str
 from _datetime import datetime
@@ -70,7 +67,6 @@ async def edit_number_task(call: CallbackQuery, state: FSMContext):
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
     tasks_list = database.get_all_tasks(user_id)
-    print(tasks_list)
     tasks_list_out = output_task(tasks_list, cap="1", str_task=number_task)
     tasks_list_id_out = await call.message.answer(f"Вы выбрали задачу номер {number_task}:\n\n{tasks_list_out}")
     await state.update_data(task=tasks_list[number_task - 1], tasks_list_id=tasks_list_id_out.message_id)
@@ -94,7 +90,6 @@ async def edit_date(call: CallbackQuery, state: FSMContext):
     await state.update_data(bot_msg_id=bot_msg.message_id)
     await state.set_state(EditTask.date)
 
-
 #изменить название
 @edit_task_router.callback_query(F.data == "edit_name")
 async def edit_name(call: CallbackQuery, state: FSMContext):
@@ -109,7 +104,6 @@ async def get_new_name(message: Message,  state: FSMContext):
     data = await state.get_data()
     bot_last_msg = data.get("bot_msg")
     task_id = (data.get("task"))[0]
-    print(task_id)
     tasks_message_id_out = data.get("tasks_list_id")
     await delete_last_message(tasks_message_id_out, message)
     await delete_last_message(bot_last_msg, message)
@@ -124,17 +118,12 @@ async def get_new_name(message: Message,  state: FSMContext):
 @edit_task_router.callback_query(F.data == "edit_time")
 async def edit_time(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    current_datetime = datetime.now()
-    real_current_day = current_datetime.day
-    real_current_month = current_datetime.month
-    real_current_year = current_datetime.year
-    real_date_str = f"{real_current_day}.{real_current_month}.{real_current_year}"
-    await state.update_data(real_date_str=real_date_str)
+    current_datetime = datetime.now().date()
+    await state.update_data(current_datetime=current_datetime)
     bot_msg = await call.message.answer("Выберите время для вашей задачи:",
                                         reply_markup=get_time_hour_keyboard(mode_key=2))
     await state.update_data(bot_msg_id=bot_msg.message_id)
     await state.set_state(EditTask.time)
-
 
 #изменить период
 @edit_task_router.callback_query(F.data == "edit_period")
@@ -143,7 +132,6 @@ async def edit_period(call: CallbackQuery, state: FSMContext):
     selected = [0, 0, 0, 0, 0, 0, 0]
     await state.update_data(selected_days=selected)
     bot_msg = await call.message.answer("Выберите новый период для вашей задачи:", reply_markup=get_period_keyboard(mode_key=2))
-
     await state.update_data(bot_msg_id=bot_msg.message_id)
     await state.set_state(EditTask.period)
 
@@ -151,11 +139,14 @@ async def edit_period(call: CallbackQuery, state: FSMContext):
 async def continue_get_period_edit(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     period = convert_selected_days_to_str(data["selected_days"])
-    print(period)
     tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
     number_task = data.get("number_task")
-    tasks[tg_id][number_task - 1]["period"] = period
-    save_to_file(DATA_FILE_PATH, tasks)
+    task_id = database.get_all_tasks(user_id)[number_task - 1][0]
+    database.delete_old_period_task(task_id) #удаляются все записи периода об этой задачи
+    for day in period:
+        day_id = database.get_weekday_id(day)
+        database.save_period_task(task_id, day_id) #сохраняем период заново
     await call.message.answer("✅ Период повторения задачи изменен!")
     await state.clear()
     await state.set_state(Menu.menu)
@@ -170,11 +161,11 @@ async def continue_get_period_edit(call: CallbackQuery, state: FSMContext):
 async def no_period_edit(call: CallbackQuery, state: FSMContext):
     await call.message.answer("✅ Задача изменена! Повторяться не будет!")
     data = await state.get_data()
-    period = 'Без повторений'
     tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
     number_task = data.get("number_task")
-    tasks[tg_id][number_task - 1]["period"] = period
-    save_to_file(DATA_FILE_PATH, tasks)
+    task_id = database.get_all_tasks(user_id)[number_task - 1][0]
+    database.delete_old_period_task(task_id)
     await state.clear()
     await state.set_state(Menu.menu)
     bot_msg_id = data.get("bot_msg_id")
@@ -193,8 +184,6 @@ async def edit_notification(call: CallbackQuery, state: FSMContext):
 
     await state.update_data(bot_msg_id=bot_msg.message_id)
     await state.set_state(EditTask.notification)
-
-
 
 #Если пользователь пишет текстом, а не выбирает кнопки в клавиатуре
 @edit_task_router.message(EditTask.date)

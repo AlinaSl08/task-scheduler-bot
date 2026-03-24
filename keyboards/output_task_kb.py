@@ -1,6 +1,5 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from storage.tasks import tasks, settings_default
-
+from database.database import database
 
 def completed_keyboard():
     kb = InlineKeyboardBuilder()
@@ -10,19 +9,22 @@ def completed_keyboard():
     return kb.as_markup()
 
 
-def completed_task_keyboard(tg_id: str, task_list=tasks):
+def completed_task_keyboard(tg_id: str, task_list):
     kb = InlineKeyboardBuilder()
     count = 0
-    if settings_default[tg_id]["format_output"] == 1:
-        for i in range(1, len(tasks[tg_id]) + 1):
-            if tasks[tg_id][i - 1]["completed"]:
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)
+    if setting_user[3] == 1:
+        for i in range(1, len(tasks_list) + 1):
+            if tasks_list[i - 1][5]:
                 kb.button(text=f"✅ {i}", callback_data=f"completed_task_{i}")
                 count += 1
             else:
                 kb.button(text=f"{i}", callback_data=f"completed_task_{i}")
                 count += 1
 
-    if settings_default[tg_id]["format_output"] == 2:
+    if setting_user[3] == 2:
         for i in range(1, len(task_list.split('\n\n'))):
             task = task_list.split('\n\n')[i]
             if "✅" in task:
@@ -32,7 +34,7 @@ def completed_task_keyboard(tg_id: str, task_list=tasks):
                 kb.button(text=f"{i}", callback_data=f"completed_task_{i}")
                 count += 1
 
-    if settings_default[tg_id]["format_output"] == 3:
+    if setting_user[3] == 3:
         for i in range(1, len(task_list.split('\n\n'))):
             task = task_list.split('\n\n')[i]
             if "✅" in task:

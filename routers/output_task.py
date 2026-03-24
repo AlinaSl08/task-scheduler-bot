@@ -1,12 +1,9 @@
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
-from database.db import save_to_file
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import settings_default, tasks
 from aiogram import Router, F
 from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
-from commands.command import DATA_FILE_PATH
 import datetime
 from database.database import database
 
@@ -19,7 +16,10 @@ def output_task(tasks_list, cap="0", str_task=0):
     for idx, task in enumerate(tasks_list, 1):
         name = task[1].capitalize()
         date = f"{task[2]:%d.%m.%Y}"
-        time = str(task[3])[:4].zfill(5)
+        td = task[3]
+        hours = td.seconds // 3600
+        minutes = (td.seconds // 60) % 60
+        time = f"{hours:02}:{minutes:02}"
         notification_id = task[4]
         completed = ""
         if task[5]: #если True
@@ -54,31 +54,35 @@ def output_task(tasks_list, cap="0", str_task=0):
     else:
         return tasks_list_out[str_task][3:]
 
-def output_task_week(tg_id: str): #тут будет вывод на неделю
+def output_task_week(tasks_list): #тут будет вывод на неделю
     tasks_list_out = []
     indexes = []
-    for idx, task in enumerate(tasks[tg_id]):
-        task_day = int(task["date"]["day"])
-        task_month = int(task["date"]["month"])
-        task_year = int(task["date"]["year"])
+    for idx, task in enumerate(tasks_list):
         current_date = datetime.date.today()  # сегодняшняя дата
         days_till_monday = datetime.date.weekday(current_date)
-        task_date = datetime.date(day=task_day, month=task_month, year=task_year)  # дата задачи
         date_monday = current_date - datetime.timedelta(days=days_till_monday) #дата понедельника с начала недели
         date_sunday = current_date - datetime.timedelta(days=days_till_monday) + datetime.timedelta(days=6)
-        if date_sunday >= task_date >= date_monday:
+        if date_sunday >= task[2] >= date_monday:
             indexes.append(idx)
-            period = task["period"]
-            completed = ""
-            if task["completed"]:
+            weekdays = []
+            periods = database.output_period_task(task[0])
+            for period in periods:
+                weekdays.append(database.get_weekday(period))
+            completed = task[5]
+            td = task[3]
+            hours = td.seconds // 3600
+            minutes = (td.seconds // 60) % 60
+            time = f"{hours:02}:{minutes:02}"
+            if completed:
                 completed = " ✅"
-            if isinstance(period, list):
-                period_str = ", ".join(period) if period else "Без повторений"
             else:
-                period_str = period
-            task_text = (f'{completed} {task["name"].capitalize()} - '
-                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
-                         f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
+                completed = ""
+            if isinstance(periods, list):
+                period_str = ", ".join(weekdays) if periods else "Без повторений"
+            else:
+                period_str = periods
+            task_text = (f'{completed} {task[1].capitalize()} - '
+                         f'{task[2]:%d.%m.%Y} в {time}. Период повторения: {period_str}')
             tasks_list_out.append(task_text)
     task_list_out = ["📌 Список дел:"]
     if len(tasks_list_out) > 0:
@@ -90,34 +94,35 @@ def output_task_week(tg_id: str): #тут будет вывод на недел�
     else:
         return False, []
 
-def output_task_today(tg_id: str): #тут будет вывод на сегодня
-    current_datetime = datetime.datetime.now() #если дата уже прошла и не выполнена, то ставим просрочено
-    current_day = current_datetime.day
-    current_month = current_datetime.month
-    current_year = current_datetime.year
-    tasks_list = []
+def output_task_today(user_id): #тут будет вывод на сегодня
+    current_datetime = datetime.datetime.now().date() #если дата уже прошла и не выполнена, то ставим просрочено
+    tasks_list_out = []
     indexes = []
-    for idx, task in enumerate(tasks[tg_id]):
-        task_day = task["date"]["day"]
-        task_month = task["date"]["month"]
-        task_year =task["date"]["year"]
-        if task_day == current_day and current_month == task_month and current_year == task_year:
+    tasks_list = database.get_all_tasks(user_id)
+    for idx, task in enumerate(tasks_list):
+        if task[2] == current_datetime:
             indexes.append(idx)
-            period = task["period"]
-            completed = ""
-            if task["completed"]:
+            weekdays = []
+            periods = database.output_period_task(task[0])
+            for period in periods:
+                weekdays.append(database.get_weekday(period))
+            completed = task[5]
+            td = task[3]
+            hours = td.seconds // 3600
+            minutes = (td.seconds // 60) % 60
+            time = f"{hours:02}:{minutes:02}"
+            if completed:
                 completed = " ✅"
-            if isinstance(period, list):
-                period_str = ", ".join(period) if period else "Без повторений"
+            if isinstance(periods, list):
+                period_str = ", ".join(weekdays) if periods else "Без повторений"
             else:
-                period_str = period
-            task_text = (f'{completed} {task["name"].capitalize()} - '
-                         f'{int(task["date"]["day"]):02}.{int(task["date"]["month"]):02}.{int(task["date"]["year"])} '
-                         f'в {task["time"]["hour"]:02}:{task["time"]["minute"]:02}. Период повторения: {period_str}')
-            tasks_list.append(task_text)
+                period_str = periods
+            task_text = (f'{completed} {task[1].capitalize()} - '
+                         f'{task[2]:%d.%m.%Y} в {time}. Период повторения: {period_str}')
+            tasks_list_out.append(task_text)
     task_list_out = ["📌 Список дел:"]
     if len(tasks_list) > 0:
-        for idx, task in enumerate(tasks_list, 1):
+        for idx, task in enumerate(tasks_list_out, 1):
             task_text = (f'{idx}) {task}')
             task_list_out.append(task_text)
         full_message = '\n\n'.join(task_list_out)
@@ -125,32 +130,33 @@ def output_task_today(tg_id: str): #тут будет вывод на сегод
     else:
         return False, []
 
-
-
 @output_task_router.callback_query(F.data == "output")
 async def output(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)
     out = "Не смог вывести список"
-    if len(tasks[tg_id]) == 0:
+    if not tasks_list:
         await call.message.answer("🙁 Список пуст!")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
     else:
         indexes = []
-        if settings_default[tg_id]["format_output"] == 1:
-            out= output_task(tg_id)
-        elif settings_default[tg_id]["format_output"] == 2:
-            out, indexes = output_task_week(tg_id)
+        if setting_user[3] == 1:
+            out= output_task(tasks_list)
+        elif setting_user[3] == 2:
+            out, indexes = output_task_week(tasks_list)
             if not out:
                 await call.message.answer("🙁 Список пуст!")
                 bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
                 await state.update_data(last_msg_id=bot_msg.message_id)
                 await call.answer()
                 return
-        elif settings_default[tg_id]["format_output"] == 3:
-            out, indexes = output_task_today(tg_id)
+        elif setting_user[3] == 3:
+            out, indexes = output_task_today(user_id)
             if not out:
                 await call.message.answer("🙁 Список пуст!")
                 bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
@@ -173,37 +179,41 @@ async def mark_completed(call: CallbackQuery, state: FSMContext):
     tg_id = str(call.from_user.id)
     data = await state.get_data()
     out_list = data.get("out")
-    await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
+    await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, out_list))
 
 @output_task_router.callback_query(F.data.startswith("completed_task_"))
 async def completed_task(call: CallbackQuery, state: FSMContext):
     task_num = int(call.data.split("_")[2])
     tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
     data = await state.get_data()
     indexes = data.get("indexes")
     if indexes:
         real_index = indexes[task_num - 1]
     else:
         real_index = task_num - 1
-    task_completed = tasks[tg_id][real_index]["completed"]
-    if not task_completed:
-        tasks[tg_id][real_index]["completed"] = True
-        save_to_file(DATA_FILE_PATH, tasks)
+    task_completed = tasks_list[real_index][5]
+    if task_completed:
+        await call.answer("Эта задача уже отмечена как выполненная!")
+    else: #если не выполнена
+        database.edit_is_status_task(tasks_list[real_index][0], 1)
+        tasks_list = database.get_all_tasks(user_id)
         out_list = ""
         indexes = []
-        format_output = settings_default[tg_id]["format_output"]
-        if format_output == 1:
-            out_list = output_task(tg_id)
+        format_output_id = database.output_settings(user_id)[3]
+        if format_output_id == 1:
+            out_list = output_task(tasks_list)
             indexes = []
-        elif format_output == 2:
-            out_list, indexes = output_task_week(tg_id)
-        elif format_output == 3:
+        elif format_output_id == 2:
+            out_list, indexes = output_task_week(tasks_list)
+        elif format_output_id == 3:
             out_list, indexes = output_task_today(tg_id)
         await state.update_data(out=out_list,indexes=indexes)
         try:
-            await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
+            await call.message.edit_text(text=out_list, reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
+            ##await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
         except Exception as e:
             print("Ошибка при смене клавиатуры:", e)
-    else:
-        await call.answer("Эта задача уже отмечена как выполненная!")
+
 

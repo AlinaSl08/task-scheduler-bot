@@ -3,8 +3,8 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import tasks
 from keyboards.clear_task_kb import confirm_clear_keyboard
+from database.database import database
 
 clear_task_router = Router()
 
@@ -12,7 +12,9 @@ clear_task_router = Router()
 async def clear_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
-    if len(tasks[tg_id]) == 0:
+    user_id = database.get_user_id(tg_id)
+    tasks_list = database.get_all_tasks(user_id)
+    if not tasks_list: #если задач нет
         await call.message.answer("🙁 Список уже пуст!")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
@@ -26,7 +28,8 @@ async def clear_task(call: CallbackQuery, state: FSMContext):
 async def confirm_clear(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
-    tasks[tg_id].clear()
+    user_id = database.get_user_id(tg_id)
+    database.clear_all_task_list(user_id) #удаляем все задачи + все периоды
     await call.message.answer("🗑️ Все задачи удалены")
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)

@@ -114,7 +114,6 @@ class Database:
             cursor.execute("INSERT INTO users(tg_id) VALUES (%s)", (tg_id,))
         self.__conn.commit()
 
-
     # выставляем дефолтные настройки
     def set_default_settings(self, user_id, timezone):
         with self.__conn.cursor() as cursor:
@@ -196,6 +195,13 @@ class Database:
                         WHERE id = %s''', (new_notification, task_id,))
         self.__conn.commit()
 
+    # изменение статуса выполнения
+    def edit_is_status_task(self, task_id, new_status):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE tasks 
+                           SET is_status = %s
+                           WHERE id = %s''', (new_status, task_id,))
+        self.__conn.commit()
 
     # --УДАЛЕНИЕ--
     # изменение периода 1
@@ -291,18 +297,6 @@ class Database:
             cursor.execute("SELECT day FROM weekdays WHERE id = %s", (day_id,))
             row = cursor.fetchone()
             return row[0] if row else None
-
-
-
-    # получаем айди задачи по user_id(тут еще наверное добавить) !!!!!!
-    def get_task_id(self, user_id):
-        with self.__conn.cursor() as cursor:
-            cursor.execute("SELECT id FROM tasks WHERE user_id = %s", (user_id,))
-            row = cursor.fetchone()
-            return row[0] if row else None
-
-
-
 
     # выводим настройки
     def output_settings(self, user_id):

@@ -4,9 +4,7 @@ from aiogram.fsm.context import FSMContext
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from keyboards.settings_kb import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
-from storage.tasks import settings_default
-from database.db import save_to_file
-from commands.command import SETTINGS_FILE_PATH
+from database.database import database
 
 settings_router = Router()
 
@@ -17,28 +15,25 @@ async def settings_task(call: CallbackQuery):
     await call.answer()
 
 #вывод задач
-@settings_router.callback_query(F.data.startswith ("task_")) #доделать
+@settings_router.callback_query(F.data.startswith ("task_"))
 async def task_all(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     tg_id = str(call.from_user.id)
-    if settings_default[tg_id]['format_output'] == number:
+    user_id = database.get_user_id(tg_id)
+    format_out = database.get_format_outputs(number)
+    format_id = database.get_format_outputs_id(format_out)
+    setting_user = database.output_settings(user_id)[3]
+    if setting_user == format_id:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=format_output_keyboard())
         return
-    formats = {
-        1: "все задачи",
-        2: "задачи на неделю",
-        3: "задачи на сегодня"
-    }
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"
         "Изменено:\n"
-        f"📄 Формат вывода — {formats[number]}"
+        f"📄 Формат вывода — {format_out}"
     )
-    settings_default[tg_id]['format_output'] = number
-    save_to_file(SETTINGS_FILE_PATH, settings_default)
-    print(settings_default)
+    database.update_format_output_settings(user_id, format_id)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
@@ -50,24 +45,20 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
     number = int(call.data.split("_")[1])
     #сделать постоянную сортировку
     tg_id = str(call.from_user.id)
-    if settings_default[tg_id]['sort'] == number:
+    user_id = database.get_user_id(tg_id)
+    format_sort = database.get_sorting(number)
+    format_id = database.get_sorting_id(format_sort)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == format_id:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=sorting_keyboard())
         return
-    sorts = {
-        1: "по порядку",
-        2: "по названию",
-        3: "по дате",
-        4: "по времени"
-    }
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"
         "Изменено:\n"
-        f"📌 Сортировка — {sorts[number]}"
+        f"📌 Сортировка — {format_sort}"
     )
-    settings_default[tg_id]['sort'] = number
-    save_to_file(SETTINGS_FILE_PATH, settings_default)
-    print(settings_default)
+    database.update_sorting_settings(user_id, format_id)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
@@ -79,19 +70,21 @@ async def utc_selection(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     tg_id = str(call.from_user.id)
-    if settings_default[tg_id]['timezone'] == number:
+    user_id = database.get_user_id(tg_id)
+    tz_id = database.get_timezone_id(number)
+    setting_user = database.output_settings(user_id)[2]
+    if setting_user == tz_id:
         await call.answer("Такая настройка уже выбрана")
         await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
         return
-    settings_default[tg_id]['timezone'] = number
-    save_to_file(SETTINGS_FILE_PATH, settings_default)
+    database.update_timezone_settings(user_id, tz_id)
+
     tz_text = f"МСК{number:+}" if number != 0 else "МСК"
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"
         "Изменено:\n"
         f"🌍 Часовой пояс — {tz_text}"
     )
-    print(settings_default)
     await call.answer()
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
