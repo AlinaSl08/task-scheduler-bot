@@ -93,6 +93,7 @@ class Database:
                              id INT PRIMARY KEY AUTO_INCREMENT,
                              task_id INT NOT NULL,
                              weekday_id INT NOT NULL,
+                             is_send_notification BOOL DEFAULT False,
                              FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                              FOREIGN KEY (weekday_id) REFERENCES weekdays(id),
                              UNIQUE(task_id, weekday_id));''')
@@ -201,6 +202,14 @@ class Database:
             cursor.execute('''UPDATE tasks 
                            SET is_status = %s
                            WHERE id = %s''', (new_status, task_id,))
+        self.__conn.commit()
+
+    # изменение статуса отправки напоминания
+    def edit_is_send_notification_period(self, task_id, new_send_notification, weekday_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''UPDATE periods 
+                            SET is_send_notification = %s
+                            WHERE task_id = %s AND weekday_id = %s''', (new_send_notification, task_id, weekday_id))
         self.__conn.commit()
 
     # --УДАЛЕНИЕ--

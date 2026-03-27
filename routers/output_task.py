@@ -6,12 +6,13 @@ from aiogram import Router, F
 from keyboards.output_task_kb import completed_keyboard, completed_task_keyboard
 import datetime
 from database.database import database
-
+import logging
 
 output_task_router = Router()
 
 #вывод по порядку
 def output_task(tasks_list, cap="0", str_task=0):
+    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = ["📌 Список дел:"]
     for idx, task in enumerate(tasks_list, 1):
         name = task[1].capitalize()
@@ -55,6 +56,7 @@ def output_task(tasks_list, cap="0", str_task=0):
         return tasks_list_out[str_task][3:]
 
 def output_task_week(tasks_list): #тут будет вывод на неделю
+    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = []
     indexes = []
     for idx, task in enumerate(tasks_list):
@@ -95,7 +97,8 @@ def output_task_week(tasks_list): #тут будет вывод на недел�
         return False, []
 
 def output_task_today(user_id): #тут будет вывод на сегодня
-    current_datetime = datetime.datetime.now().date() #если дата уже прошла и не выполнена, то ставим просрочено
+    current_datetime = datetime.datetime.now().date()
+    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = []
     indexes = []
     tasks_list = database.get_all_tasks(user_id)
@@ -132,6 +135,7 @@ def output_task_today(user_id): #тут будет вывод на сегодн�
 
 @output_task_router.callback_query(F.data == "output")
 async def output(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
@@ -142,7 +146,6 @@ async def output(call: CallbackQuery, state: FSMContext):
         await call.message.answer("🙁 Список пуст!")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
-        await call.answer()
     else:
         indexes = []
         if setting_user[3] == 1:
@@ -153,7 +156,6 @@ async def output(call: CallbackQuery, state: FSMContext):
                 await call.message.answer("🙁 Список пуст!")
                 bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
                 await state.update_data(last_msg_id=bot_msg.message_id)
-                await call.answer()
                 return
         elif setting_user[3] == 3:
             out, indexes = output_task_today(user_id)
@@ -161,18 +163,16 @@ async def output(call: CallbackQuery, state: FSMContext):
                 await call.message.answer("🙁 Список пуст!")
                 bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
                 await state.update_data(last_msg_id=bot_msg.message_id)
-                await call.answer()
                 return
         await state.update_data(out=out, indexes=indexes)
         await call.message.answer(out, reply_markup=completed_keyboard())
-        await call.answer()
 
 @output_task_router.callback_query(F.data == "menu")
 async def menu(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     await safe_delete(call.message)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
-    await call.answer()
 
 @output_task_router.callback_query(F.data == "mark_completed")
 async def mark_completed(call: CallbackQuery, state: FSMContext):
@@ -212,8 +212,7 @@ async def completed_task(call: CallbackQuery, state: FSMContext):
         await state.update_data(out=out_list,indexes=indexes)
         try:
             await call.message.edit_text(text=out_list, reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
-            ##await call.message.edit_reply_markup(reply_markup=completed_task_keyboard(tg_id, task_list=out_list))
         except Exception as e:
-            print("Ошибка при смене клавиатуры:", e)
+            logging.info(f"Ошибка при смене клавиатуры: {e}")
 
 

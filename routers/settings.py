@@ -8,11 +8,11 @@ from database.database import database
 
 settings_router = Router()
 
-@settings_router.callback_query(F.data == "settings") #сортировка (по дате и времени, по названию), часовой пояс
+@settings_router.callback_query(F.data == "settings")
 async def settings_task(call: CallbackQuery):
+    await call.answer()
     await safe_delete(call.message)
     await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
-    await call.answer()
 
 #вывод задач
 @settings_router.callback_query(F.data.startswith ("task_"))
@@ -44,6 +44,8 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     #сделать постоянную сортировку
+
+
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
     format_sort = database.get_sorting(number)
@@ -63,7 +65,6 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
     await state.update_data(last_msg_id=bot_msg.message_id)
     await call.answer()
 
-
 #выбор часового пояса
 @settings_router.callback_query(F.data.startswith ("utc_")) #тут доделать
 async def utc_selection(call: CallbackQuery, state: FSMContext):
@@ -78,7 +79,6 @@ async def utc_selection(call: CallbackQuery, state: FSMContext):
         await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
         return
     database.update_timezone_settings(user_id, tz_id)
-
     tz_text = f"МСК{number:+}" if number != 0 else "МСК"
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"
@@ -92,20 +92,21 @@ async def utc_selection(call: CallbackQuery, state: FSMContext):
 #-ФОРМАТ ВЫВОДА-
 @settings_router.callback_query(F.data == "format_output")
 async def format_output(call: CallbackQuery):
+    await call.answer()
     await safe_delete(call.message)
     await call.message.answer("Выберите формат вывода задач:", reply_markup=format_output_keyboard())
-    await call.answer()
 
 #-СОРТИРОВКА-
 @settings_router.callback_query(F.data == "sorting")
 async def sorting(call: CallbackQuery):
+    await call.answer()
     await safe_delete(call.message)
     await call.message.answer("Выберите способ сортировки:", reply_markup=sorting_keyboard())
-    await call.answer()
 
 #-ЧАСОВОЙ ПОЯС-
 @settings_router.callback_query(F.data == "timezone")
 async def time_zone(call: CallbackQuery):
+    await call.answer()
     await safe_delete(call.message)
     await call.message.answer("Выберите ваш часовой пояс:", reply_markup=time_zone_keyboard())
 
@@ -115,10 +116,10 @@ async def cancel_setting(call: CallbackQuery, state: FSMContext):
     comm = call.data.split("_")[2]
     await safe_delete(call.message)
     await call.answer("Возвращаемся назад...")
-    if comm == "menu":
+    if comm == "menu": #в меню
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
-    elif comm == "back":
+    elif comm == "back": #в настройки
         await call.message.answer("Выберите действие:", reply_markup=settings_menu_keyboard())
     await call.answer()
 

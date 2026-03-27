@@ -1,5 +1,6 @@
 from aiogram.types import Message
 import aiogram
+import logging
 
 # функция удаления сообщения по его айди
 async def delete_last_message(last_msg_id: int, message: Message):
@@ -10,11 +11,11 @@ async def delete_last_message(last_msg_id: int, message: Message):
                 message_id=last_msg_id #айди смс которое хотим удалить
             )
         except aiogram.exceptions.TelegramBadRequest as tbr:
-            print("При удалении несуществующего сообщения произошла ошибка!")
+            logging.info("При удалении несуществующего сообщения произошла ошибка!")
 
 #удаление предыдущих сообщений с проверкой
 async def safe_delete(message: Message):
     try:
         await message.delete()
     except aiogram.exceptions.TelegramBadRequest as tbr:
-        print("При удалении несуществующего сообщения произошла ошибка!: ", tbr)
+        logging.info(f"При удалении несуществующего сообщения произошла ошибка!: {tbr}", )

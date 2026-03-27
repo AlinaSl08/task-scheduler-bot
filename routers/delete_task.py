@@ -1,13 +1,15 @@
 from aiogram.types import CallbackQuery
 from aiogram.fsm.context import FSMContext
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
-from storage.tasks import tasks
 from keyboards.delete_task_kb import delete_task_keyboard, delete_issue
 from routers.output_task import output_task
-from states.menu import Menu
+from states.menu_state import Menu
 from utils.delete_last_message import delete_last_message
+from database.database import database
+from utils.scheduler import schedule_all_tasks, add_overdue_checker
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 delete_task_router = Router()
 
@@ -16,47 +18,40 @@ delete_task_router = Router()
 async def delete_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
-    if len(tasks[tg_id]) == 0:
+    user_id = database.get_user_id(tg_id)
+    tasks = database.get_all_tasks(user_id)
+    if len(tasks) == 0:
         await call.message.answer("😊 Нет задач, которые можно удалить")
-        bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
+        bot_msg = await call.message.answer("Выберите действие:",
+                                            reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
     else:
-        tasks_list = output_task(tg_id)
+        tasks_list = output_task(tasks)
         tasks_message = await call.message.answer(tasks_list)
         await state.update_data(tasks_message_id=tasks_message.message_id)
-        await call.message.answer(f"Выберите задачу, которую желаете удалить:", reply_markup=delete_task_keyboard(tg_id))
+        await call.message.answer(f"Выберите задачу, которую желаете удалить:", reply_markup=delete_task_keyboard(user_id))
         await call.answer()
 
 @delete_task_router.callback_query(F.data.startswith("del_task_"))
 async def delete(call: CallbackQuery, state: FSMContext):
+    await call.answer()
     tg_id = str(call.from_user.id)
-    await safe_delete(call.message)
+    user_id = database.get_user_id(tg_id)
+    tasks = database.get_all_tasks(user_id)
     number_task = int(call.data.split("_")[2])
+    await safe_delete(call.message)
     await state.update_data(number_task=number_task)
-    tasks_list = output_task(tg_id, str_task=number_task)
+    tasks_list = output_task(tasks, str_task=number_task)
     data = await state.get_data()
     tasks_message_id = data.get("tasks_message_id")
     await delete_last_message(tasks_message_id, call.message)
     number_task_message = await call.message.answer(f"Вы выбрали задачу номер {number_task}:\n\n{tasks_list}")
     await state.update_data(number_task_message_id=number_task_message.message_id)
     await call.message.answer("⚠️ Вы уверены, что хотите выполнить удаление?", reply_markup=delete_issue())
-    await call.answer()
-
-@delete_task_router.callback_query(F.data == "delete_no")
-async def delete_no(call: CallbackQuery, state: FSMContext):
-    await safe_delete(call.message)
-    data = await state.get_data()
-    tasks_message = data.get("number_task_message_id")
-    await call.bot.delete_message(chat_id=call.message.chat.id,
-                message_id=tasks_message)
-    await call.message.answer("❎ Удаление отменено")
-    bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
-    await state.update_data(last_msg_id=bot_msg.message_id)
-    await call.answer()
 
 @delete_task_router.callback_query(F.data == "delete_yes")
-async def delete_yes(call: CallbackQuery, state: FSMContext):
+async def delete_yes(call: CallbackQuery, state: FSMContext, scheduler: AsyncIOScheduler, bot: Bot):
     await safe_delete(call.message)
     data = await state.get_data()
     tasks_message = data.get("number_task_message_id")
@@ -64,9 +59,12 @@ async def delete_yes(call: CallbackQuery, state: FSMContext):
                                   message_id=tasks_message)
     number_task = data.get("number_task")
     tg_id = str(call.from_user.id)
-    del tasks[tg_id][number_task - 1]
+    user_id = database.get_user_id(tg_id)
+    database.delete_task(user_id, number_task)
+    scheduler.remove_all_jobs()
+    schedule_all_tasks(scheduler, bot)
+    add_overdue_checker(scheduler)
     await call.message.answer("✅ Задача успешно удалена!")
-    print(tasks)
     await state.clear()
     await state.set_state(Menu.menu)
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())

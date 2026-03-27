@@ -1,12 +1,13 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from storage.tasks import tasks
+from database.database import database
 
-def delete_task_keyboard(tg_id: str):
+def delete_task_keyboard(user_id: str):
+    tasks = database.get_all_tasks(user_id)
     kb = InlineKeyboardBuilder()
-    for i in range(1, len(tasks[tg_id]) + 1):
+    for i in range(1, len(tasks) + 1):
         kb.button(text=f"{i}", callback_data=f"del_task_{i}")
     kb.button(text="❎ Отменить удаление", callback_data="delete_cancel")
-    count = len(tasks[tg_id])
+    count = len(tasks)
     if count <= 4:
         kb.adjust(1)
     elif count <= 10:
@@ -18,6 +19,6 @@ def delete_task_keyboard(tg_id: str):
 def delete_issue():
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Да", callback_data="delete_yes")
-    kb.button(text="❌ Нет", callback_data="delete_no")
+    kb.button(text="❌ Нет", callback_data="delete_cancel")
     kb.adjust(2)
     return kb.as_markup()

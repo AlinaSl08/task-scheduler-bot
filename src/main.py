@@ -14,33 +14,24 @@ from routers.edit_task import edit_task_router
 from routers.clear_task import clear_task_router
 from routers.settings import settings_router
 from commands.command import commands_router, set_bot_commands
-from routers.scheduler_handler import scheduler_router
+from routers.scheduler import scheduler_router
 from utils.scheduler import setup_scheduler
-
 
 #сделать напоминания по времени (кнопки вып\не вып), не работает
 #подключить бд
 #сделать статистику по выполненным задачам(на неделю автомат по воскресеньям в 20:00)
 #в amvera не работает ничего
 #доделать кнопки настроек(сортировку)
-
-
-
+#проверка на просроченность задачи
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-
-
-
 #--ЗАПУСК БОТА--
 async def main():
     bot = Bot(token=TOKEN)
-
     dp = Dispatcher(storage=MemoryStorage())  # хранит состояние пользователя(на каком шаге находится)
-
     logging.basicConfig(level=logging.INFO)  # уровень логирования
-
     main_router = Router()
     dp.include_router(main_router)  # добавляет роутер в поле зрения(в диспетчер)
     dp.include_router(add_task_router)
@@ -53,8 +44,7 @@ async def main():
     dp.include_router(scheduler_router)
     await set_bot_commands(bot) #задает команды для бота
     scheduler = setup_scheduler(bot)
-
-    await dp.start_polling(bot) #обращается к серверу тг и проверяет на новые сообщения
+    await dp.start_polling(bot, scheduler=scheduler) #обращается к серверу тг и проверяет на новые сообщения
 
 if __name__ == "__main__": #если запускается из этого файла, то работает, если импортируется, то нет
     asyncio.run(main()) #запуск асинхронности

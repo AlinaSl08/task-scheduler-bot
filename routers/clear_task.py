@@ -1,10 +1,12 @@
 from aiogram.types import CallbackQuery
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from keyboards.clear_task_kb import confirm_clear_keyboard
 from database.database import database
+from utils.scheduler import schedule_all_tasks, add_overdue_checker
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 clear_task_router = Router()
 
@@ -20,16 +22,20 @@ async def clear_task(call: CallbackQuery, state: FSMContext):
         await state.update_data(last_msg_id=bot_msg.message_id)
         await call.answer()
     else:
-        await call.message.answer("⚠️ Вы уверены, что хотите удалить ВСЕ задачи?", reply_markup=confirm_clear_keyboard())
+        await call.message.answer("⚠️ Вы уверены, что хотите удалить ВСЕ задачи?",
+                                  reply_markup=confirm_clear_keyboard())
         await call.answer()
 
 # очистить список
 @clear_task_router.callback_query(F.data == "clear_yes")
-async def confirm_clear(call: CallbackQuery, state: FSMContext):
+async def confirm_clear(call: CallbackQuery, state: FSMContext, scheduler: AsyncIOScheduler, bot: Bot):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
     database.clear_all_task_list(user_id) #удаляем все задачи + все периоды
+    scheduler.remove_all_jobs()
+    schedule_all_tasks(scheduler, bot)
+    add_overdue_checker(scheduler)
     await call.message.answer("🗑️ Все задачи удалены")
     bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
     await state.update_data(last_msg_id=bot_msg.message_id)
