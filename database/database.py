@@ -293,6 +293,13 @@ class Database:
             row = cursor.fetchone()
             return row[0] if row else None
 
+    # получаем айди напоминания
+    def get_notification(self, notification_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute("SELECT notification FROM notifications WHERE id = %s", (notification_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     # получаем айди дня недели
     def get_weekday_id(self, day):
         with self.__conn.cursor() as cursor:
@@ -324,6 +331,13 @@ class Database:
         with self.__conn.cursor() as cursor:
             cursor.execute("SELECT id, name, date, time, notification_id, is_status FROM tasks WHERE user_id = %s", (user_id,))
             return cursor.fetchall()
+
+    # выводим все задачи определенного юзера
+    def get_task_by_id(self, task_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute("SELECT id, name, date, time, notification_id, is_status FROM tasks WHERE id = %s", (task_id,))
+            return cursor.fetchall()
+
 
     # выводим период задачи
     def output_period_task(self, task_id):

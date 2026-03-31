@@ -12,7 +12,7 @@ from states.menu_state import Menu
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from database.database import database
 import logging
-from utils.scheduler import schedule_all_tasks, add_overdue_checker
+from utils.scheduler import schedule_all_tasks, add_overdue_checker, schedule_single_task
 
 add_task_router = Router()
 
@@ -206,18 +206,21 @@ async def notification_task(call: CallbackQuery, state: FSMContext, bot: Bot, sc
                 for day in period_days:
                     period_day_id = database.get_weekday_id(day)
                     database.save_period_task(task_id, period_day_id) # добавляем период
-            scheduler.remove_all_jobs()
-            schedule_all_tasks(scheduler, bot)
-            add_overdue_checker(scheduler)
+            #scheduler.remove_all_jobs()
+            #schedule_all_tasks(scheduler, bot)
+            task = database.get_task_by_id(task_id)[0]
+            print(task)
+            schedule_single_task(scheduler, bot, user_id, tg_id, task)
+            #add_overdue_checker(scheduler)
             bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
             await state.update_data(last_msg_id=bot_msg.message_id)
         else:
             number_task = data.get("number_task")
             task_id = database.get_all_tasks(user_id)[number_task - 1][0]
             database.edit_notification_task(task_id, notification_id)
-            scheduler.remove_all_jobs()
+            #scheduler.remove_all_jobs()
             schedule_all_tasks(scheduler, bot)
-            add_overdue_checker(scheduler)
+            #add_overdue_checker(scheduler)
             bot_msg_id = data.get("bot_msg_id")
             tasks_message_id_out = data.get("tasks_list_id")
             await delete_last_message(tasks_message_id_out, call.message)
