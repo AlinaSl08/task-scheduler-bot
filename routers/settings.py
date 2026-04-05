@@ -42,14 +42,10 @@ async def task_all(call: CallbackQuery, state: FSMContext):
 @settings_router.callback_query(F.data.startswith ("sort_"))
 async def sort_name(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
-    number = int(call.data.split("_")[1])
-    #сделать постоянную сортировку
-
-
+    format_id = int(call.data.split("_")[1])
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    format_sort = database.get_sorting(number)
-    format_id = database.get_sorting_id(format_sort)
+    format_sort = database.get_sorting(format_id)
     setting_user = database.output_settings(user_id)[4]
     if setting_user == format_id:
         await call.answer("Такая настройка уже выбрана")

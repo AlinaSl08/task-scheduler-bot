@@ -22,7 +22,13 @@ async def edit_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = call.from_user.id
     user_id = database.get_user_id(tg_id)
-    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks_list = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks_list = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks_list = database.get_all_tasks_by_date(user_id)
     if len(tasks_list) == 0:
         await call.message.answer("😊 Нет задач, которые можно изменить")
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())

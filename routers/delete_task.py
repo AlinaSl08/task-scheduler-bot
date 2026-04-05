@@ -19,7 +19,13 @@ async def delete_task(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    tasks = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks = database.get_all_tasks_by_date(user_id)
     if len(tasks) == 0:
         await call.message.answer("😊 Нет задач, которые можно удалить")
         bot_msg = await call.message.answer("Выберите действие:",
@@ -38,7 +44,13 @@ async def delete(call: CallbackQuery, state: FSMContext):
     await call.answer()
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    tasks = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks = database.get_all_tasks_by_date(user_id)
     number_task = int(call.data.split("_")[2])
     await safe_delete(call.message)
     await state.update_data(number_task=number_task)

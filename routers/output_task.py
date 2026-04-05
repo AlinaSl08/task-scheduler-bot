@@ -12,7 +12,6 @@ output_task_router = Router()
 
 #вывод по порядку
 def output_task(tasks_list, cap="0", str_task=0):
-    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = ["📌 Список дел:"]
     for idx, task in enumerate(tasks_list, 1):
         name = task[1].capitalize()
@@ -56,7 +55,6 @@ def output_task(tasks_list, cap="0", str_task=0):
         return tasks_list_out[str_task][3:]
 
 def output_task_week(tasks_list): #тут будет вывод на неделю
-    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = []
     indexes = []
     for idx, task in enumerate(tasks_list):
@@ -98,10 +96,15 @@ def output_task_week(tasks_list): #тут будет вывод на недел�
 
 def output_task_today(user_id): #тут будет вывод на сегодня
     current_datetime = datetime.datetime.now().date()
-    # если дата уже прошла и не выполнена, то ставим просрочено(надо сделать)
     tasks_list_out = []
     indexes = []
-    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks_list = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks_list = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks_list = database.get_all_tasks_by_date(user_id)
     for idx, task in enumerate(tasks_list):
         if task[2] == current_datetime:
             indexes.append(idx)
@@ -139,7 +142,13 @@ async def output(call: CallbackQuery, state: FSMContext):
     await safe_delete(call.message)
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks_list = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks_list = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks_list = database.get_all_tasks_by_date(user_id)
     setting_user = database.output_settings(user_id)
     out = "Не смог вывести список"
     if not tasks_list:
@@ -149,7 +158,7 @@ async def output(call: CallbackQuery, state: FSMContext):
     else:
         indexes = []
         if setting_user[3] == 1:
-            out= output_task(tasks_list)
+            out = output_task(tasks_list)
         elif setting_user[3] == 2:
             out, indexes = output_task_week(tasks_list)
             if not out:
@@ -186,7 +195,13 @@ async def completed_task(call: CallbackQuery, state: FSMContext):
     task_num = int(call.data.split("_")[2])
     tg_id = str(call.from_user.id)
     user_id = database.get_user_id(tg_id)
-    tasks_list = database.get_all_tasks(user_id)
+    setting_user = database.output_settings(user_id)[4]
+    if setting_user == 1:
+        tasks_list = database.get_all_tasks(user_id)
+    elif setting_user == 2:
+        tasks_list = database.get_all_tasks_by_name(user_id)
+    else:
+        tasks_list = database.get_all_tasks_by_date(user_id)
     data = await state.get_data()
     indexes = data.get("indexes")
     if indexes:
@@ -198,7 +213,12 @@ async def completed_task(call: CallbackQuery, state: FSMContext):
         await call.answer("Эта задача уже отмечена как выполненная!")
     else: #если не выполнена
         database.edit_is_status_task(tasks_list[real_index][0], 1)
-        tasks_list = database.get_all_tasks(user_id)
+        if setting_user == 1:
+            tasks_list = database.get_all_tasks(user_id)
+        elif setting_user == 2:
+            tasks_list = database.get_all_tasks_by_name(user_id)
+        else:
+            tasks_list = database.get_all_tasks_by_date(user_id)
         out_list = ""
         indexes = []
         format_output_id = database.output_settings(user_id)[3]

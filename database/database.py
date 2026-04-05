@@ -326,18 +326,33 @@ class Database:
             cursor.execute("SELECT * FROM users")
             return cursor.fetchall()
 
-    # выводим все задачи определенного юзера
+    # выводим все задачи определенного юзера (по порядку)
     def get_all_tasks(self, user_id):
         with self.__conn.cursor() as cursor:
             cursor.execute("SELECT id, name, date, time, notification_id, is_status FROM tasks WHERE user_id = %s", (user_id,))
             return cursor.fetchall()
 
-    # выводим все задачи определенного юзера
+    # выводим все задачи определенного юзера (по названию)
+    def get_all_tasks_by_name(self, user_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''SELECT id, name, date, time, notification_id, is_status 
+                                FROM tasks WHERE user_id = %s
+                                ORDER BY name ASC''', (user_id,))
+            return cursor.fetchall()
+
+    # выводим все задачи определенного юзера (по дате)
+    def get_all_tasks_by_date(self, user_id):
+        with self.__conn.cursor() as cursor:
+            cursor.execute('''SELECT id, name, date, time, notification_id, is_status 
+            FROM tasks WHERE user_id = %s
+            ORDER BY date, time ASC''', (user_id,))
+            return cursor.fetchall()
+
+    # выводим задачу по айди задачи
     def get_task_by_id(self, task_id):
         with self.__conn.cursor() as cursor:
             cursor.execute("SELECT id, name, date, time, notification_id, is_status FROM tasks WHERE id = %s", (task_id,))
             return cursor.fetchall()
-
 
     # выводим период задачи
     def output_period_task(self, task_id):
@@ -360,9 +375,7 @@ class Database:
                            (user_id, current_date,))
             return cursor.fetchall()
 
-
-
-    # для отладки, потом удалить
+    # для отладки
     def get_all_tasks_debugging(self):
         # создаем курсор, который передвигается по бд
         cursor = self.__conn.cursor()

@@ -14,30 +14,10 @@ import pymorphy3
 from database.database import database
 
 morph = pymorphy3.MorphAnalyzer()
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-# Базовый путь к папке data
-# На Amvera это будет /data, локально - data
-DATA_DIR = os.path.join(BASE_DIR, "data")
-
-# Путь к конкретному файлу
-DATA_FILE_PATH = os.path.join(DATA_DIR, "data.json")
-SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")
-
-
 commands_router = Router()
-#DATA_FILE_PATH = 'data/data.json'
-#SETTINGS_FILE_PATH = 'data/settings.json'
-os.makedirs(DATA_DIR, exist_ok=True)
-
-
-#read_from_file(DATA_FILE_PATH, tasks)
-#read_from_file(SETTINGS_FILE_PATH, settings_default)
-
 
 timezone_transcript = {-1: "МСК-1", 0: "МСК", 1: "МСК+1", 2: "МСК+2", 3: "МСК+3", 4: "МСК+4",
         5: "МСК+5", 6: "МСК+6", 7: "МСК+7", 8: "МСК+8", 9: "МСК+9"}
-
 
 @commands_router.message(Command("start"))
 async def start(message: Message, state: FSMContext): #обозначаем что мы дадим в функцию(какой тип данных)

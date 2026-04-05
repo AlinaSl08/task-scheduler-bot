@@ -16,9 +16,8 @@ def sorting_keyboard():
     kb.button(text="📁 По порядку", callback_data="sort_1")
     kb.button(text="🔤 По названию", callback_data="sort_2")
     kb.button(text="📅 По дате", callback_data="sort_3")
-    kb.button(text="⏰ По времени", callback_data="sort_4")
     kb.button(text="⬅️ Назад", callback_data="cancel_setting_back")
-    kb.adjust(2, 2, 1)
+    kb.adjust(2, 2)
     return kb.as_markup()
 
 #клавиатура выбора часового пояса
