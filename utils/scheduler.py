@@ -15,7 +15,6 @@ def get_keyboard(task_id):
 
 async def send_reminder(bot: Bot, user_id, tg_id, task):
     try:
-        print('в send_reminder пришло')
         date = f"{task[2]:%d.%m.%Y}"
         td = task[3]
         hours = td.seconds // 3600
@@ -51,33 +50,28 @@ def add_overdue_checker(scheduler):
 
 def schedule_single_task(scheduler: AsyncIOScheduler, bot: Bot, user_id, tg_id, task):
     if task[5] is not None: #если задача просроченная\выполненная
-        print('task[5] is not None')
         return
-    #tz_id = database.output_settings(user_id)[2]
-    #tz = database.get_timezone(tz_id)
-    #user_timezone = timezone(timedelta(hours=int(tz))) #часовой пояс с настроек берем
-    td = task[3]
-    # total_seconds = td.total_seconds()
-    # hours = int(total_seconds // 3600)
-    # minutes = int((total_seconds % 3600) // 60)
-    #task_datetime = datetime.combine(task[2], time(hour=hours, minute=minutes))
+    tz_id = database.output_settings(user_id)[2] #айди часового пояса
+    tz = database.get_timezone(tz_id) #значение часового пояса
+    user_timezone = timedelta(hours=int(tz)) #создание utc+
+    td = task[3] #время задачи
     task_datetime = datetime.combine(task[2], datetime.min.time()) + td
-    #now_with_tz = datetime.now(user_timezone) #текущая дата с нужным часовым поясом
-    #task_time_utc = task_datetime.replace(tzinfo=user_timezone).astimezone(timezone.utc)
-    print(task_datetime)
+    now = datetime.now()
+    task_time = task_datetime + user_timezone #текущая дата с нужным часовым поясом
+    print('task_datetime', task_datetime)
+    print('task_time', task_time)
     #если напоминание есть
     if task[4] is not None:
         notification_count = database.get_notification(int(task[4]))
         # время уведомления для напоминаний до задачи
-        reminder_time_until = task_datetime - timedelta(minutes=int(notification_count))
+        reminder_time_until = task_time - timedelta(minutes=int(notification_count))
         # пропускаем если напоминание до задачи уже прошло
-        #now_utc = datetime.now(timezone.utc)
-        now = datetime.now()
+        print('reminder_time_until', reminder_time_until)
         if reminder_time_until <= now:
             logging.info("Время напоминания уже прошло")
             scheduler.add_job(
                 send_reminder,
-                trigger=DateTrigger(run_date=task_datetime),
+                trigger=DateTrigger(run_date=reminder_time_until),
                 args=[bot, user_id, tg_id, task],
                 id=f"rem_exact_{task[0]}",
                 replace_existing=True)
@@ -90,36 +84,24 @@ def schedule_single_task(scheduler: AsyncIOScheduler, bot: Bot, user_id, tg_id, 
                     database.edit_is_send_notification_period(task[0], 1, period) #меняем статус отправки напоминания
                     day = database.get_weekday(period)
                     logging.info(f"Напоминание отмечено отправленным в {day}")
-        print('Перед add_job')
-        print("REMINDER:", reminder_time_until)
-        print("NOW UTC:", datetime.now())
-        #print("DELTA:", reminder_time_until)
         job = scheduler.add_job(
             send_reminder,
             trigger=DateTrigger(run_date=reminder_time_until),
             args=[bot, user_id, tg_id, task],
             id=f"rem_before_{task[0]}",
             replace_existing=True)
-        print("JOB ADDED:", scheduler.get_jobs())
-        print("ADDED JOB:", job.id)
-        print("NEXT RUN:", job.trigger)
     #если напоминания до задачи нет
-    # if task_time_utc > now_with_tz:
-    #     print('Перед add_job2')
-    #     job = scheduler.add_job(
-    #         send_reminder,
-    #         trigger=DateTrigger(run_date=task_time_utc),
-    #         args=[bot, user_id, tg_id, task],
-    #         id=f"rem_exact_{task[0]}",
-    #         replace_existing=True)
-    #     print("JOB ADDED:", scheduler.get_jobs())
-    #     print("ADDED JOB:", job.id)
-    #     print("NEXT RUN:", job.trigger)
+    if task_time > now:
+        job = scheduler.add_job(
+                 send_reminder,
+                 trigger=DateTrigger(run_date=task_time),
+                 args=[bot, user_id, tg_id, task],
+                 id=f"rem_exact_{task[0]}",
+                 replace_existing=True)
 
 def schedule_all_tasks(scheduler: AsyncIOScheduler, bot: Bot):
     users_data = database.get_all_user() #список всех юзеров
     #может понадобиться проверка на наличие задач
-    print('зашла в schedule_all_tasks')
     for user_id, tg_id in users_data:
         tasks = database.get_all_tasks(user_id)
         for task in tasks:

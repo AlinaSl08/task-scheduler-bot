@@ -32,7 +32,7 @@ class Database:
             #cursor.execute("DROP TABLE IF EXISTS periods, tasks, settings, users, format_outputs, timezones, sortings, notifications, weekdays;")
             cursor.execute('''CREATE TABLE IF NOT EXISTS users(
                             id INT PRIMARY KEY AUTO_INCREMENT,
-                            tg_id INT NOT NULL)''')
+                            tg_id BIGINT NOT NULL UNIQUE)''')
             cursor.execute('''CREATE TABLE IF NOT EXISTS format_outputs(
                              id INT PRIMARY KEY AUTO_INCREMENT,
                              format VARCHAR(100) NOT NULL UNIQUE);''')
@@ -112,7 +112,7 @@ class Database:
     # добавляем нового пользователя
     def add_new_user(self, tg_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute("INSERT INTO users(tg_id) VALUES (%s)", (tg_id,))
+            cursor.execute("INSERT IGNORE INTO users(tg_id) VALUES (%s)", (tg_id,))
         self.__conn.commit()
 
     # выставляем дефолтные настройки
@@ -134,7 +134,7 @@ class Database:
     # сохранение периода задачи после добавления\изменение периода 2 (добавление новых записей)
     def save_period_task(self, task_id, weekday_id):
         with self.__conn.cursor() as cursor:
-            cursor.execute('''INSERT INTO periods(task_id, weekday_id)
+            cursor.execute('''INSERT IGNORE INTO periods(task_id, weekday_id)
                                 VALUES (%s, %s)''', (task_id, weekday_id,))
         self.__conn.commit()
 

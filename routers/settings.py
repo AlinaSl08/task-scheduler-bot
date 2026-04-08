@@ -5,6 +5,9 @@ from utils.delete_last_message import safe_delete
 from keyboards.main_kb import main_menu_keyboard
 from keyboards.settings_kb import settings_menu_keyboard, sorting_keyboard, time_zone_keyboard, format_output_keyboard
 from database.database import database
+from utils.scheduler import schedule_all_tasks
+from aiogram import Bot
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 settings_router = Router()
 
@@ -63,7 +66,7 @@ async def sort_name(call: CallbackQuery, state: FSMContext):
 
 #выбор часового пояса
 @settings_router.callback_query(F.data.startswith ("utc_")) #тут доделать
-async def utc_selection(call: CallbackQuery, state: FSMContext):
+async def utc_selection(call: CallbackQuery, state: FSMContext, scheduler: AsyncIOScheduler, bot: Bot):
     await safe_delete(call.message)
     number = int(call.data.split("_")[1])
     tg_id = str(call.from_user.id)
@@ -75,6 +78,7 @@ async def utc_selection(call: CallbackQuery, state: FSMContext):
         await call.message.answer("Выберите действие:", reply_markup=time_zone_keyboard())
         return
     database.update_timezone_settings(user_id, tz_id)
+    schedule_all_tasks(scheduler, bot)
     tz_text = f"МСК{number:+}" if number != 0 else "МСК"
     await call.message.answer(
         "⚙️ Настройки обновлены\n\n"
