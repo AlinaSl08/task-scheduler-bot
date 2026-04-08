@@ -183,15 +183,15 @@ def convert_selected_days_to_str(selected_days):
 
 #сохраняем задачу
 @add_task_router.callback_query(F.data.startswith("notification_"))
-async def notification_task(call: CallbackQuery, state: FSMContext, bot: Bot, scheduler: AsyncIOScheduler = None):
+async def notification_task(call: CallbackQuery, state: FSMContext, scheduler: AsyncIOScheduler = None):
+    tg_id = str(call.from_user.id)
+    user_id = database.get_user_id(tg_id)
+    task_id = 0
     try:
         bot = call.bot
-
         notification = int(call.data.split("_")[2]) #если 0, то нет напоминаний
         notification_id = database.get_notification_id(notification)
         notification_mode = call.data.split("_")[1]
-        tg_id = str(call.from_user.id)
-        user_id = database.get_user_id(tg_id)
         data = await state.get_data()
         if notification_mode == "add":
             last_msg_id = data.get("last_msg_id")
@@ -206,34 +206,32 @@ async def notification_task(call: CallbackQuery, state: FSMContext, bot: Bot, sc
                 for day in period_days:
                     period_day_id = database.get_weekday_id(day)
                     database.save_period_task(task_id, period_day_id) # добавляем период
-            #scheduler.remove_all_jobs()
-            #schedule_all_tasks(scheduler, bot)
             task = database.get_task_by_id(task_id)[0]
             print(task)
             schedule_single_task(scheduler, bot, user_id, tg_id, task)
-            #add_overdue_checker(scheduler)
             bot_msg = await call.message.answer("✅ Задача успешно добавлена!")
             await state.update_data(last_msg_id=bot_msg.message_id)
         else:
             number_task = data.get("number_task")
             task_id = database.get_all_tasks(user_id)[number_task - 1][0]
             database.edit_notification_task(task_id, notification_id)
-            #scheduler.remove_all_jobs()
             schedule_all_tasks(scheduler, bot)
-            #add_overdue_checker(scheduler)
             bot_msg_id = data.get("bot_msg_id")
             tasks_message_id_out = data.get("tasks_list_id")
             await delete_last_message(tasks_message_id_out, call.message)
             await delete_last_message(bot_msg_id, call.message)
             await call.message.answer("✅ Напоминание задачи изменено!")
+    except Exception as e:
+        #удаление задачи если ошибка и если она есть
+        if task_id:
+            database.delete_task(user_id, task_id)
+        logging.info(f"Ошибка при добавлении задачи: {e}")
+        await call.answer("Ошибка при добавлении задачи.")
+    finally:
         await state.clear()
         await state.set_state(Menu.menu)
         bot_msg = await call.message.answer("Выберите действие:", reply_markup=main_menu_keyboard())
         await state.update_data(last_msg_id=bot_msg.message_id)
-    except Exception as e:
-        logging.info(f"Ошибка при добавлении задачи.: {e}")
-        await call.answer("Ошибка при добавлении задачи.")
-        await call.message.answer("Перезапустите бота через /start")
 
 #-ФУНКЦИИ КЛАВИАТУРЫ ДАТЫ-
 #если нажмет пустую стрелочку, на месяц и год, на день недели (заглушка)
